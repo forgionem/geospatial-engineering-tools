@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Simulación 3D interactiva del teorema de Bernoulli y la ecuación de continuidad en un tubo de Venturi.">
+<title>Tubo de Venturi 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: escena 3D a ancho completo arriba; debajo, controles + lectura de las 3 secciones + balance de energía */
+:root{
+  --bg:#0B1622; --panel:#112233; --panel2:#16293D; --line:#22384F;
+  --fg:#E3ECF5; --muted:#8FA3B8;
+  --press:#45a8ff; --kin:#ff8f3f; --energy:#f5d76e; --ok:#5fe0b5;
+  --f-display:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,4vw,40px);line-height:1.05;margin:0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--kin)}
+.eq{font-family:var(--f-mono);font-size:clamp(13px,1.6vw,16px);background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:8px 14px;white-space:nowrap;overflow-x:auto;max-width:100%}
+.eq .p{color:var(--press)} .eq .k{color:var(--kin)} .eq .c{color:var(--energy)}
+.stage{position:relative;height:min(64vh,620px);min-height:380px;border-radius:16px;overflow:hidden;border:1px solid var(--line);
+  background:radial-gradient(120% 90% at 50% 20%,#14223d 0%,var(--bg) 70%)}
+#c{display:block;width:100%;height:100%;touch-action:none}
+.tag{position:absolute;left:0;top:0;transform:translate(-50%,-100%);pointer-events:none;font-family:var(--f-mono);font-size:12px;
+  background:rgba(10,17,32,.82);border:1px solid var(--line);border-radius:8px;padding:5px 8px;white-space:nowrap;line-height:1.35}
+.tag b{font-family:var(--f-display);font-size:13px;color:var(--fg)}
+.tag .v{color:var(--kin)} .tag .pp{color:var(--press)}
+.legend{position:absolute;left:14px;bottom:12px;font-family:var(--f-mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.ramp{width:170px;height:8px;border-radius:4px;background:linear-gradient(90deg,#2b6bff,#18d6e0,#7cf26a,#ffd23c,#ff4a2a)}
+.ramp-l{display:flex;justify-content:space-between;width:170px}
+.hint{position:absolute;right:14px;bottom:12px;font-size:12px;color:var(--muted)}
+.elabel{position:absolute;font-family:var(--f-mono);font-size:11px;color:var(--energy);transform:translate(4px,-120%);pointer-events:none;white-space:nowrap}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+@media (max-width:920px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0}
+.lab{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl .row{display:flex;justify-content:space-between;align-items:baseline}
+.ctl output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--kin)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:500 13px var(--f-body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)} button:focus-visible,input:focus-visible{outline:2px solid var(--energy);outline-offset:2px}
+table{width:100%;border-collapse:collapse;font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;color:var(--muted);font-family:var(--f-body)}
+thead th{font-family:var(--f-display);font-weight:500;color:var(--fg)}
+td.v{color:var(--kin)} td.p{color:var(--press)}
+.tblwrap{overflow-x:auto}
+.bars{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:end;height:170px}
+.bar{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.stack{width:58%;max-width:64px;flex:1;display:flex;flex-direction:column-reverse;border-radius:6px;overflow:hidden;background:var(--panel2);position:relative}
+.stack .sp{background:var(--press);transition:height .25s}
+.stack .sk{background:var(--kin);transition:height .25s}
+.bar span{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.keys i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.note{font-size:13.5px;color:var(--muted);margin:0}
+.note strong{color:var(--fg);font-weight:500}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+ol.steps li::marker{color:var(--energy);font-family:var(--f-mono)}
+.warn{font-size:13px;color:#ffb38a;border-left:3px solid var(--kin);padding:4px 10px;margin:0}
+
+/* Identidad compartida: paleta y tipografía del Planificador de Misiones UAV / Navegador de Campo (variante oscura) */
+:root{--brand:#4F8FC7;--brand-ink:#08121C;--accent:#ED6D15;--accent-ink:#FFFFFF;--disp:'Orbitron','Arial Narrow',Arial,sans-serif;color-scheme:dark}
+html,body{margin:0}
+body{font-family:var(--f-body)}
+h1{font-family:var(--disp)!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.04em;font-size:clamp(20px,3.2vw,30px)!important;line-height:1.18!important;color:var(--brand)}
+h1 em{color:var(--accent)!important;font-style:normal}
+.by{font:500 12px var(--f-mono);color:var(--fg);margin-top:8px;letter-spacing:.02em}
+a.li{color:var(--brand);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+.card{border-radius:8px}
+.card h2,.card h3{font:700 13px var(--disp)!important;text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+.card h2#sTitle{font:600 19px var(--f-body)!important;text-transform:none;letter-spacing:0;color:var(--fg)}
+.tag b{font-family:var(--f-body)!important;font-weight:600}
+thead th{font-family:var(--f-body)!important;font-weight:600}
+button{border-radius:5px;font-weight:600}
+button.pri{background:var(--brand)!important;border-color:var(--brand)!important;color:var(--brand-ink)!important}
+input[type=range]{accent-color:var(--accent)!important}
+.step[aria-current="step"]{border-color:var(--accent)!important;background:#1e2a36!important;color:var(--fg)}
+.step[aria-current="step"] .n{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important}
+.eyebrow{color:var(--accent)!important}
+.key b{color:var(--accent)!important}
+.seg button[aria-pressed="true"]{border-color:var(--accent)!important;background:#2a1d12!important;color:#fff}
+.legal{background:var(--panel);border:1px solid var(--line);border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:28px;padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--disp);letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 10px}
+.legal p{margin:0 0 9px;font-size:12.5px;color:var(--muted);max-width:75ch}
+.srcs{margin:0;padding:0;list-style:none;columns:2 220px;column-gap:24px;font-size:12.5px}
+.srcs li{break-inside:avoid;margin-bottom:5px;color:var(--muted);overflow-wrap:anywhere}
+.srcs a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-top:6px}
+.sitefoot{color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.sitefoot b{color:var(--brand);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Teorema de Bernoulli en un <em>tubo de Venturi</em></h1>
+      <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div></div>
+    <div class="eq"><span class="p">P</span> + <span class="k">½·ρ·v²</span> + ρ·g·z = <span class="c">constante</span> &nbsp;·&nbsp; A₁·v₁ = A₂·v₂</div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="c"></canvas>
+    <div class="tag" id="t1"></div><div class="tag" id="t2"></div><div class="tag" id="t3"></div>
+    <div class="elabel" id="el">Línea de energía total</div>
+    <div class="legend"><span>Velocidad de las partículas</span><div class="ramp"></div>
+      <div class="ramp-l"><span id="vmin">—</span><span id="vmax">—</span></div></div>
+    <div class="hint">Arrastra para girar · rueda o pellizco para zoom</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Controles del experimento</h2>
+      <div class="ctl"><div class="row"><label class="lab" for="q">Caudal Q</label><output id="qo"></output></div>
+        <input id="q" type="range" min="0.5" max="8" step="0.1" value="3"></div>
+      <div class="ctl"><div class="row"><label class="lab" for="d2">Diámetro de la garganta d₂</label><output id="d2o"></output></div>
+        <input id="d2" type="range" min="30" max="95" step="1" value="50"></div>
+      <div class="ctl"><div class="row"><label class="lab" for="sp">Velocidad de la animación</label><output id="spo"></output></div>
+        <input id="sp" type="range" min="0.1" max="2" step="0.05" value="1"></div>
+      <div class="btns">
+        <button id="play" type="button">Pausar</button>
+        <button id="view" type="button">Vista lateral</button>
+        <button id="reset" type="button">Restablecer</button>
+      </div>
+      <p class="note">Agua, ρ = 1000 kg/m³ · tubo horizontal (z constante) · d₁ = d₃ = 100 mm · presión manométrica a la entrada P₁ = 50 kPa.</p>
+    </section>
+
+    <section class="card">
+      <h2>Lectura en las tres secciones</h2>
+      <div class="tblwrap"><table>
+        <thead><tr><th></th><th>① Entrada</th><th>② Garganta</th><th>③ Salida</th></tr></thead>
+        <tbody>
+          <tr><td>Diámetro</td><td id="d_1"></td><td id="d_2"></td><td id="d_3"></td></tr>
+          <tr><td>Área A</td><td id="a_1"></td><td id="a_2"></td><td id="a_3"></td></tr>
+          <tr><td>Velocidad v</td><td class="v" id="v_1"></td><td class="v" id="v_2"></td><td class="v" id="v_3"></td></tr>
+          <tr><td>½ρv² (cinética)</td><td class="v" id="k_1"></td><td class="v" id="k_2"></td><td class="v" id="k_3"></td></tr>
+          <tr><td>Presión P</td><td class="p" id="p_1"></td><td class="p" id="p_2"></td><td class="p" id="p_3"></td></tr>
+          <tr><td>Altura h = P/ρg</td><td class="p" id="h_1"></td><td class="p" id="h_2"></td><td class="p" id="h_3"></td></tr>
+        </tbody>
+      </table></div>
+      <p class="warn" id="warn" hidden>En la garganta la presión cae por debajo de la atmosférica (succión). La columna del manómetro se vacía: es el principio de las bombas de chorro y los carburadores.</p>
+    </section>
+
+    <section class="card">
+      <h2>Balance de energía por unidad de volumen</h2>
+      <div class="bars">
+        <div class="bar"><div class="stack"><div class="sp" id="bp1"></div><div class="sk" id="bk1"></div></div><span>①</span></div>
+        <div class="bar"><div class="stack"><div class="sp" id="bp2"></div><div class="sk" id="bk2"></div></div><span>②</span></div>
+        <div class="bar"><div class="stack"><div class="sp" id="bp3"></div><div class="sk" id="bk3"></div></div><span>③</span></div>
+      </div>
+      <div class="keys"><span><i style="background:var(--press)"></i>Presión P</span><span><i style="background:var(--kin)"></i>Cinética ½ρv²</span></div>
+      <p class="note">La altura total de cada barra es la misma: <strong id="tot"></strong>. La energía no se pierde, solo cambia de forma.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Cómo leer la animación</h2>
+    <ol class="steps">
+      <li><strong>Continuidad.</strong> El mismo caudal pasa por todas las secciones. Si el área se reduce, el fluido debe acelerar: A₁·v₁ = A₂·v₂. Observa cómo las partículas se apiñan y cambian a rojo en la garganta.</li>
+      <li><strong>Bernoulli.</strong> Si la velocidad sube, la presión baja en la misma proporción energética. Los manómetros verticales lo muestran: la columna de la garganta es la más baja.</li>
+      <li><strong>Línea de energía.</strong> La línea dorada marca la energía total (P + ½ρv²) expresada en altura de agua. La distancia entre esa línea y cada columna es la altura de velocidad v²/2g.</li>
+      <li><strong>Recuperación.</strong> En el difusor de salida el área vuelve a crecer, el fluido frena y la presión se recupera. En este modelo ideal (sin fricción) vuelve a ser igual a P₁.</li>
+    </ol>
+  </section>
+<section class="legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Simulación con fines didácticos. Representa un flujo ideal: incompresible, estacionario, sin viscosidad ni pérdidas por fricción, en un tubo horizontal. En un Venturi real existen pérdidas de carga y la presión de salida no se recupera por completo.</p>
+    <p>Los valores numéricos ilustran el principio y no deben usarse para dimensionar equipos, instalaciones ni medidores de caudal. El autor no asume responsabilidad por decisiones derivadas del uso de esta herramienta.</p>
+    <p>Los cálculos se ejecutan en este dispositivo; la página no envía datos a ningún servidor. Necesita conexión a internet para cargar las tipografías y la librería Three.js.</p><p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+<li class="grp">Bibliografía</li>
+<li>White, F. M. – Fluid Mechanics. McGraw-Hill.</li>
+<li>Çengel, Y. A. y Cimbala, J. M. – Mecánica de fluidos: fundamentos y aplicaciones. McGraw-Hill.</li>
+<li class="grp">Divulgación técnica</li>
+<li><a href="https://www.grc.nasa.gov/www/k-12/airplane/bern.html" target="_blank" rel="noopener">NASA Glenn Research Center – Bernoulli's Equation</a></li>
+<li class="grp">Librerías</li>
+<li><a href="https://threejs.org" target="_blank" rel="noopener">Three.js – librería de gráficos 3D (licencia MIT)</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer class="sitefoot">
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const RHO=1000,G=9.81,R1=0.05,P1G=50000; // SI
+const U_PER_M=0.75;      // unidades de escena por metro de columna de agua
+const GLASS_H=5.2;       // altura del tubo piezométrico (unidades)
+const XS=[-4.2,0,4.4];   // posición de las secciones medidas
+const X0=-7,X1=7;
+const state={Q:3e-3,k:0.5,speed:1,playing:!matchMedia('(prefers-reduced-motion: reduce)').matches};
+
+const smooth=t=>t*t*(3-2*t);
+function rAt(x,k=state.k){
+  if(x<-2.2) return 1;
+  if(x<-0.6) return 1+(k-1)*smooth((x+2.2)/1.6);
+  if(x<=0.6) return k;
+  if(x<3.4) return k+(1-k)*smooth((x-0.6)/2.8);
+  return 1;
+}
+function physics(){
+  const A1=Math.PI*R1*R1, v1=state.Q/A1, out=[];
+  for(const x of XS){
+    const r=R1*rAt(x), A=Math.PI*r*r, v=state.Q/A;
+    const kin=0.5*RHO*v*v, P=P1G+0.5*RHO*v1*v1-kin;
+    out.push({d:2*r,A,v,kin,P,h:P/(RHO*G)});
+  }
+  return {v1,total:P1G+0.5*RHO*v1*v1,s:out};
+}
+
+/* ---------- Escena ---------- */
+const canvas=document.getElementById('c'), stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x0a1120,22,48);
+const camera=new THREE.PerspectiveCamera(42,1,0.1,200);
+const controls=new THREE.OrbitControls(camera,canvas);
+controls.enableDamping=true; controls.target.set(0,1.6,0);
+controls.minDistance=6; controls.maxDistance=34;
+function setView(side){
+  if(side){camera.position.set(0,2.8,20);} else {camera.position.set(-9,7.4,14.5);}
+  controls.target.set(0,2.5,0); controls.update();
+}
+setView(false);
+
+scene.add(new THREE.HemisphereLight(0x9cc8ff,0x0a1120,0.9));
+const dl=new THREE.DirectionalLight(0xffffff,0.9); dl.position.set(5,10,8); scene.add(dl);
+const pl=new THREE.PointLight(0xff8f3f,1.2,14); pl.position.set(0,0,3); scene.add(pl);
+
+// Suelo con rejilla
+const grid=new THREE.GridHelper(40,40,0x2a3d63,0x16223a); grid.position.y=-1.9; scene.add(grid);
+
+// Tubo de vidrio (torno a lo largo de X)
+const glassMat=new THREE.MeshPhysicalMaterial({color:0x9fd2ff,transparent:true,opacity:0.16,roughness:0.05,metalness:0,
+  side:THREE.DoubleSide,depthWrite:false,clearcoat:1});
+const edgeMat=new THREE.LineBasicMaterial({color:0x5c8fd6,transparent:true,opacity:0.35});
+let tube,rings;
+function buildTube(){
+  if(tube){scene.remove(tube);tube.geometry.dispose();}
+  if(rings){scene.remove(rings);rings.traverse(o=>o.geometry&&o.geometry.dispose());}
+  const pts=[];
+  for(let i=0;i<=160;i++){const x=X0+(X1-X0)*i/160;pts.push(new THREE.Vector2(rAt(x)*1.02,x));}
+  const g=new THREE.LatheGeometry(pts,72);
+  tube=new THREE.Mesh(g,glassMat); tube.rotation.z=-Math.PI/2; tube.renderOrder=2; scene.add(tube);
+  rings=new THREE.Group();
+  for(let i=0;i<=28;i++){
+    const x=X0+(X1-X0)*i/28, r=rAt(x)*1.02;
+    const c=new THREE.EllipseCurve(0,0,r,r,0,Math.PI*2).getPoints(48);
+    const lg=new THREE.BufferGeometry().setFromPoints(c.map(p=>new THREE.Vector3(0,p.x,p.y)));
+    const l=new THREE.Line(lg,edgeMat); l.position.x=x; rings.add(l);
+  }
+  // Anillos de medición brillantes
+  XS.forEach((x,i)=>{
+    const r=rAt(x)*1.04;
+    const t=new THREE.Mesh(new THREE.TorusGeometry(r,0.035,10,64),new THREE.MeshBasicMaterial({color:[0x45a8ff,0xff8f3f,0x45a8ff][i]}));
+    t.rotation.y=Math.PI/2; t.position.x=x; rings.add(t);
+  });
+  scene.add(rings);
+}
+
+// Manómetros (tubos piezométricos)
+const mano=XS.map((x,i)=>{
+  const grp=new THREE.Group(); grp.position.x=x; scene.add(grp);
+  const glass=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,GLASS_H,32,1,true),glassMat);
+  grp.add(glass);
+  const liquid=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,1,32),
+    new THREE.MeshStandardMaterial({color:0x45a8ff,emissive:0x1a4f99,emissiveIntensity:0.8,roughness:0.3}));
+  grp.add(liquid);
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.16,1,24),liquid.material);
+  grp.add(stem);
+  // marcas de escala cada 1 m de columna
+  const ticks=new THREE.Group();
+  for(let m=0;m<=6;m++){
+    const tk=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.015,0.015),new THREE.MeshBasicMaterial({color:0x8c9cb8}));
+    tk.position.set(0.26,m*U_PER_M,0); ticks.add(tk);
+  }
+  grp.add(ticks);
+  return {grp,glass,liquid,stem,ticks};
+});
+const BASE=1.15; // y donde empieza la escala (0 m de columna)
+function placeMano(){
+  mano.forEach((m,i)=>{
+    const top=rAt(XS[i]);
+    m.stem.scale.y=BASE-top; m.stem.position.y=(BASE+top)/2;
+    m.glass.position.y=BASE+GLASS_H/2;
+    m.ticks.position.y=BASE;
+  });
+}
+
+// Línea de energía total
+const eLine=new THREE.Mesh(new THREE.BoxGeometry(XS[2]-XS[0]+1.6,0.04,0.04),
+  new THREE.MeshBasicMaterial({color:0xf5d76e,transparent:true,opacity:0.9}));
+scene.add(eLine);
+const eGlow=new THREE.Mesh(new THREE.BoxGeometry(XS[2]-XS[0]+1.6,0.18,0.18),
+  new THREE.MeshBasicMaterial({color:0xf5d76e,transparent:true,opacity:0.12,depthWrite:false}));
+scene.add(eGlow);
+eLine.position.x=eGlow.position.x=(XS[0]+XS[2])/2;
+
+/* ---------- Partículas ---------- */
+const N=3200;
+const pos=new Float32Array(N*3), col=new Float32Array(N*3);
+const px=new Float32Array(N), pth=new Float32Array(N), pf=new Float32Array(N), pw=new Float32Array(N);
+for(let i=0;i<N;i++){px[i]=X0+Math.random()*(X1-X0);pth[i]=Math.random()*Math.PI*2;pf[i]=Math.sqrt(Math.random())*0.9;pw[i]=(Math.random()-0.5)*0.6;}
+const pg=new THREE.BufferGeometry();
+pg.setAttribute('position',new THREE.BufferAttribute(pos,3));
+pg.setAttribute('color',new THREE.BufferAttribute(col,3));
+const sprite=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');
+  const gr=x.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.35,'rgba(255,255,255,.85)');gr.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
+const pmat=new THREE.PointsMaterial({size:0.16,map:sprite,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+const points=new THREE.Points(pg,pmat); scene.add(points);
+
+const ramp=[[0x2b,0x6b,0xff],[0x18,0xd6,0xe0],[0x7c,0xf2,0x6a],[0xff,0xd2,0x3c],[0xff,0x4a,0x2a]].map(c=>c.map(v=>v/255));
+function rampColor(t,out,o){
+  t=Math.min(1,Math.max(0,t))*(ramp.length-1); const i=Math.min(ramp.length-2,Math.floor(t)), f=t-i;
+  for(let j=0;j<3;j++) out[o+j]=ramp[i][j]+(ramp[i+1][j]-ramp[i][j])*f;
+}
+
+/* ---------- Interfaz ---------- */
+const $=id=>document.getElementById(id);
+const fmt=(n,d=2)=>n.toLocaleString('es',{minimumFractionDigits:d,maximumFractionDigits:d});
+let phys;
+function update(){
+  state.Q=+$('q').value/1000; state.k=+$('d2').value/100; state.speed=+$('sp').value;
+  $('qo').textContent=fmt(+$('q').value,1)+' L/s';
+  $('d2o').textContent=$('d2').value+' mm';
+  $('spo').textContent='×'+fmt(state.speed,2);
+  phys=physics();
+  phys.s.forEach((s,i)=>{
+    const n=i+1;
+    $('d_'+n).textContent=fmt(s.d*1000,0)+' mm';
+    $('a_'+n).textContent=fmt(s.A*1e4,1)+' cm²';
+    $('v_'+n).textContent=fmt(s.v)+' m/s';
+    $('k_'+n).textContent=fmt(s.kin/1000,1)+' kPa';
+    $('p_'+n).textContent=fmt(s.P/1000,1)+' kPa';
+    $('h_'+n).textContent=fmt(s.h)+' m';
+    const max=phys.total;
+    $('bp'+n).style.height=Math.max(0,s.P)/max*100+'%';
+    $('bk'+n).style.height=(Math.min(s.kin,max))/max*100+'%';
+  });
+  $('tot').textContent=fmt(phys.total/1000,1)+' kPa ≈ '+fmt(phys.total/(RHO*G))+' m de agua';
+  $('warn').hidden=phys.s[1].P>=0;
+  $('vmin').textContent=fmt(phys.v1)+' m/s'; $('vmax').textContent=fmt(phys.s[1].v)+' m/s';
+  buildTube(); placeMano();
+  const eh=BASE+phys.total/(RHO*G)*U_PER_M;
+  eLine.position.y=eGlow.position.y=Math.min(eh,BASE+GLASS_H);
+}
+['q','d2','sp'].forEach(id=>$(id).addEventListener('input',update));
+$('play').addEventListener('click',()=>{state.playing=!state.playing;$('play').textContent=state.playing?'Pausar':'Reanudar';});
+let side=false;
+$('view').addEventListener('click',()=>{side=!side;setView(side);$('view').textContent=side?'Vista 3D':'Vista lateral';});
+$('reset').addEventListener('click',()=>{$('q').value=3;$('d2').value=50;$('sp').value=1;side=false;setView(false);$('view').textContent='Vista lateral';update();});
+$('play').textContent=state.playing?'Pausar':'Reanudar';
+update();
+
+// Animación de columnas con suavizado
+const liqH=[0,0,0];
+function resize(){
+  const w=stage.clientWidth,h=stage.clientHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize',resize); resize();
+
+const tags=[$('t1'),$('t2'),$('t3')], el=$('el'), tmp=new THREE.Vector3();
+function project(v){tmp.copy(v).project(camera);return {x:(tmp.x+1)/2*stage.clientWidth,y:(1-tmp.y)/2*stage.clientHeight,vis:tmp.z<1};}
+const names=['① Entrada','② Garganta','③ Salida'];
+
+let last=performance.now(), tAcc=0;
+function frame(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now;
+  const v1=phys.v1, vT=phys.s[1].v, VIS=1.15;
+  if(state.playing) tAcc+=dt;
+  for(let i=0;i<N;i++){
+    let x=px[i]; const r=rAt(x), v=v1/(r*r);
+    if(state.playing){
+      // perfil ligeramente más rápido en el centro para dar volumen
+      x+=v*(1.08-0.16*pf[i]*pf[i])*dt*VIS*state.speed;
+      if(x>X1){x=X0+(x-X1);pth[i]=Math.random()*Math.PI*2;}
+      px[i]=x;
+      pth[i]+=pw[i]*dt*0.4;
+    }
+    const rr=rAt(x)*pf[i];
+    pos[i*3]=x; pos[i*3+1]=Math.cos(pth[i])*rr; pos[i*3+2]=Math.sin(pth[i])*rr;
+    const t=vT>v1?(v1/(rAt(x)**2)-v1)/(vT-v1):0;
+    rampColor(t,col,i*3);
+  }
+  pg.attributes.position.needsUpdate=true; pg.attributes.color.needsUpdate=true;
+
+  phys.s.forEach((s,i)=>{
+    const target=Math.max(0.02,Math.min(GLASS_H-0.05,s.h*U_PER_M));
+    liqH[i]+=(target-liqH[i])*Math.min(1,dt*4);
+    const m=mano[i];
+    m.liquid.scale.y=liqH[i]; m.liquid.position.y=BASE+liqH[i]/2;
+    const c=new THREE.Color(); const pn=Math.max(0,Math.min(1,s.P/phys.total));
+    c.setHSL(0.58,0.95,0.32+0.28*pn); m.liquid.material.color.copy(c); m.liquid.material.emissive.copy(c).multiplyScalar(0.5);
+    const p=project(new THREE.Vector3(XS[i],BASE+GLASS_H+0.35,0));
+    tags[i].style.transform=`translate(${p.x}px,${p.y}px) translate(-50%,-100%)`;
+    tags[i].style.visibility=p.vis?'visible':'hidden';
+    tags[i].innerHTML=`<b>${names[i]}</b><br><span class="v">v ${fmt(s.v)} m/s</span><br><span class="pp">P ${fmt(s.P/1000,1)} kPa</span>`;
+  });
+  const ep=project(new THREE.Vector3(XS[2]+0.8,eLine.position.y,0));
+  el.style.left=ep.x+'px'; el.style.top=ep.y+'px'; el.style.visibility=ep.vis?'visible':'hidden';
+  eGlow.material.opacity=0.10+0.06*Math.sin(now/400);
+  pl.intensity=1+0.4*Math.sin(now/300);
+
+  controls.update(); renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

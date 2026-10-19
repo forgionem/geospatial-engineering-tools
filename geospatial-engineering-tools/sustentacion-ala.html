@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Simulación 3D interactiva de la sustentación de un ala explicada a partir del efecto Venturi y el teorema de Bernoulli.">
+<title>Sustentación de un Ala</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: túnel de viento 3D a ancho completo; debajo, controles · lectura aerodinámica · curva de presiones; al final, explicación */
+:root{
+  --bg:#0B1622; --panel:#112233; --panel2:#16293D; --line:#22384F;
+  --fg:#E3ECF5; --muted:#8FA3B8;
+  --low:#3fd3ff; --high:#ff5a3c; --lift:#f5d76e; --kin:#ff8f3f;
+  --f-display:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(26px,4vw,40px);line-height:1.05;margin:0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--low)}
+.eq{font-family:var(--f-mono);font-size:clamp(13px,1.6vw,16px);background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:8px 14px;white-space:nowrap;overflow-x:auto;max-width:100%}
+.eq .a{color:var(--low)} .eq .b{color:var(--high)} .eq .c{color:var(--lift)}
+.stage{position:relative;height:min(66vh,640px);min-height:400px;border-radius:16px;overflow:hidden;border:1px solid var(--line);
+  background:radial-gradient(120% 90% at 50% 15%,#152746 0%,var(--bg) 72%)}
+#c{display:block;width:100%;height:100%;touch-action:none}
+.tag{position:absolute;left:0;top:0;pointer-events:none;font-family:var(--f-mono);font-size:12px;
+  background:rgba(10,17,32,.84);border:1px solid var(--line);border-radius:8px;padding:5px 8px;white-space:nowrap;line-height:1.35}
+.tag b{font-family:var(--f-display);font-size:13px}
+.tag.up b{color:var(--low)} .tag.dn b{color:var(--high)} .tag.lf b{color:var(--lift)}
+.legend{position:absolute;left:14px;bottom:12px;font-family:var(--f-mono);font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.ramp{width:170px;height:8px;border-radius:4px}
+.r1{background:linear-gradient(90deg,#2b6bff,#18d6e0,#7cf26a,#ffd23c,#ff4a2a)}
+.r2{background:linear-gradient(90deg,#3fd3ff,#2a4a7a 50%,#ff5a3c)}
+.ramp-l{display:flex;justify-content:space-between;width:170px}
+.hint{position:absolute;right:14px;bottom:12px;font-size:12px;color:var(--muted)}
+.stall{position:absolute;left:50%;top:14px;transform:translateX(-50%);font-size:13px;color:#ffd0b8;background:rgba(80,20,10,.75);
+  border:1px solid var(--high);border-radius:8px;padding:6px 12px;max-width:calc(100% - 32px);text-align:center}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr);gap:14px}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:500;font-size:17px;margin:0}
+.lab{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl .row{display:flex;justify-content:space-between;align-items:baseline}
+.ctl output{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--low)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:500 13px var(--f-body);color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)} button.pri{border-color:#e9e9e9;color:#fff}
+button:focus-visible,input:focus-visible{outline:2px solid var(--lift);outline-offset:2px}
+dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:7px 12px;font-size:14px}
+dt{color:var(--muted)} dd{margin:0;font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+dd.a{color:var(--low)} dd.b{color:var(--high)} dd.c{color:var(--lift)}
+.meter{display:flex;flex-direction:column;gap:6px}
+.track{height:12px;border-radius:6px;background:var(--panel2);position:relative;overflow:hidden;border:1px solid var(--line)}
+.fill{position:absolute;left:0;top:0;bottom:0;background:var(--lift);transition:width .25s}
+.wline{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--fg)}
+.meter .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+#cp{width:100%;height:230px;display:block}
+.keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.keys i{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:3px}
+.note{font-size:13.5px;color:var(--muted);margin:0}
+.note strong{color:var(--fg);font-weight:500}
+.explain{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:820px){.explain{grid-template-columns:1fr}}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+ol.steps li::marker{color:var(--lift);font-family:var(--f-mono)}
+.myth{border-left:3px solid var(--high);padding:2px 0 2px 12px;font-size:14px;margin:0}
+.myth strong{color:#ffc3b0}
+
+/* Identidad compartida: paleta y tipografía del Planificador de Misiones UAV / Navegador de Campo (variante oscura) */
+:root{--brand:#4F8FC7;--brand-ink:#08121C;--accent:#ED6D15;--accent-ink:#FFFFFF;--disp:'Orbitron','Arial Narrow',Arial,sans-serif;color-scheme:dark}
+html,body{margin:0}
+body{font-family:var(--f-body)}
+h1{font-family:var(--disp)!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.04em;font-size:clamp(20px,3.2vw,30px)!important;line-height:1.18!important;color:var(--brand)}
+h1 em{color:var(--accent)!important;font-style:normal}
+.by{font:500 12px var(--f-mono);color:var(--fg);margin-top:8px;letter-spacing:.02em}
+a.li{color:var(--brand);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+.card{border-radius:8px}
+.card h2,.card h3{font:700 13px var(--disp)!important;text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+.card h2#sTitle{font:600 19px var(--f-body)!important;text-transform:none;letter-spacing:0;color:var(--fg)}
+.tag b{font-family:var(--f-body)!important;font-weight:600}
+thead th{font-family:var(--f-body)!important;font-weight:600}
+button{border-radius:5px;font-weight:600}
+button.pri{background:var(--brand)!important;border-color:var(--brand)!important;color:var(--brand-ink)!important}
+input[type=range]{accent-color:var(--accent)!important}
+.step[aria-current="step"]{border-color:var(--accent)!important;background:#1e2a36!important;color:var(--fg)}
+.step[aria-current="step"] .n{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important}
+.eyebrow{color:var(--accent)!important}
+.key b{color:var(--accent)!important}
+.seg button[aria-pressed="true"]{border-color:var(--accent)!important;background:#2a1d12!important;color:#fff}
+.legal{background:var(--panel);border:1px solid var(--line);border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:28px;padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--disp);letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 10px}
+.legal p{margin:0 0 9px;font-size:12.5px;color:var(--muted);max-width:75ch}
+.srcs{margin:0;padding:0;list-style:none;columns:2 220px;column-gap:24px;font-size:12.5px}
+.srcs li{break-inside:avoid;margin-bottom:5px;color:var(--muted);overflow-wrap:anywhere}
+.srcs a{color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-top:6px}
+.sitefoot{color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.sitefoot b{color:var(--brand);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Del tubo de Venturi a la <em>sustentación de un ala</em></h1>
+      <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div></div>
+    <div class="eq"><span class="a">P<sub>extradós</sub></span> &lt; <span class="b">P<sub>intradós</sub></span> &nbsp;→&nbsp; <span class="c">L = ½·ρ·V²·S·C<sub>L</sub></span></div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="c"></canvas>
+    <div class="tag up" id="tUp"></div><div class="tag dn" id="tDn"></div><div class="tag lf" id="tL"></div>
+    <div class="stall" id="stall" hidden>Por encima de ~13° un ala real entra en pérdida: el flujo se desprende del extradós y la sustentación cae. Este modelo ideal no lo representa.</div>
+    <div class="legend">
+      <span>Velocidad local / velocidad del aire libre</span><div class="ramp r1"></div><div class="ramp-l"><span>0,4×</span><span>1×</span><span>1,8×</span></div>
+      <span>Presión sobre el ala</span><div class="ramp r2"></div><div class="ramp-l"><span>baja</span><span>alta</span></div>
+    </div>
+    <div class="hint">Arrastra para girar · rueda o pellizco para zoom</div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Túnel de viento</h2>
+      <div class="ctl"><div class="row"><label class="lab" for="aoa">Ángulo de ataque α</label><output id="aoao"></output></div>
+        <input id="aoa" type="range" min="-6" max="16" step="0.5" value="3"></div>
+      <div class="ctl"><div class="row"><label class="lab" for="cam">Curvatura del perfil</label><output id="camo"></output></div>
+        <input id="cam" type="range" min="0" max="0.2" step="0.01" value="0.04"></div>
+      <div class="ctl"><div class="row"><label class="lab" for="vel">Velocidad del avión V</label><output id="velo"></output></div>
+        <input id="vel" type="range" min="15" max="80" step="1" value="45"></div>
+      <div class="ctl"><div class="row"><label class="lab" for="sp">Velocidad de la animación</label><output id="spo"></output></div>
+        <input id="sp" type="range" min="0.1" max="2" step="0.05" value="1"></div>
+      <div class="btns">
+        <button id="smoke" class="pri" type="button">Soltar línea de humo</button>
+        <button id="play" type="button">Pausar</button>
+        <button id="view" type="button">Vista de perfil</button>
+        <button id="reset" type="button">Restablecer</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Lectura aerodinámica</h2>
+      <dl>
+        <dt>Velocidad máx. sobre el extradós</dt><dd class="a" id="vUp"></dd>
+        <dt>Presión mín. en el extradós</dt><dd class="a" id="pUp"></dd>
+        <dt>Presión media en el intradós</dt><dd class="b" id="pDn"></dd>
+        <dt>Presión dinámica q = ½ρV²</dt><dd id="q"></dd>
+        <dt>Coeficiente de sustentación C<sub>L</sub></dt><dd class="c" id="cl"></dd>
+        <dt>Sustentación L (S = 16,2 m²)</dt><dd class="c" id="lift"></dd>
+      </dl>
+      <div class="meter">
+        <div class="row"><span>Sustentación frente al peso</span><span id="ratio"></span></div>
+        <div class="track"><div class="fill" id="fill"></div><div class="wline" id="wline"></div></div>
+        <div class="row"><span>0</span><span>Peso de una avioneta ligera ≈ 10,9 kN</span></div>
+      </div>
+      <p class="note">Aire a nivel del mar, ρ = 1,225 kg/m³. Superficie alar y peso típicos de una avioneta de cuatro plazas.</p>
+    </section>
+
+    <section class="card">
+      <h2>Distribución de presión a lo largo de la cuerda</h2>
+      <canvas id="cp" aria-label="Gráfico del coeficiente de presión en extradós e intradós"></canvas>
+      <div class="keys"><span><i style="background:var(--low)"></i>Extradós (arriba)</span><span><i style="background:var(--high)"></i>Intradós (abajo)</span></div>
+      <p class="note">El área entre las dos curvas es proporcional a la sustentación. Por convención aeronáutica el eje vertical se dibuja como −C<sub>p</sub>: la succión queda hacia arriba.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Cómo pasar del Venturi al ala</h2>
+    <div class="explain">
+      <ol class="steps">
+        <li><strong>Medio Venturi.</strong> Sobre el extradós las líneas de corriente se acercan entre sí, igual que las paredes del tubo en la garganta. Entre dos líneas de corriente pasa siempre el mismo caudal, así que si el "tubo" se estrecha, el aire acelera.</li>
+        <li><strong>Bernoulli.</strong> Donde el aire va más rápido la presión es menor: P + ½ρV² se mantiene constante a lo largo de cada línea. Las flechas celestes del extradós son succión y las rojas del intradós son sobrepresión.</li>
+        <li><strong>Fuerza neta.</strong> La diferencia de presión entre abajo y arriba, multiplicada por la superficie del ala, da la sustentación. La flecha dorada es su resultante, aplicada cerca del 25 % de la cuerda.</li>
+        <li><strong>Ángulo y curvatura.</strong> Al subir el ángulo de ataque o la curvatura, la diferencia de velocidades crece y la sustentación aumenta. Con poca velocidad, el ala necesita más ángulo para sostener el mismo peso: por eso los aviones despegan con el morro levantado.</li>
+      </ol>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p class="myth"><strong>Un mito frecuente.</strong> Se suele enseñar que el aire de arriba acelera porque "debe llegar al mismo tiempo" al borde de salida que el de abajo. No es cierto. Pulsa <em>Soltar línea de humo</em>: la parte superior llega bastante antes, no al mismo tiempo.</p>
+        <p class="myth"><strong>Dónde se queda corta la analogía.</strong> El ala no tiene una pared superior como el Venturi. La aceleración se debe a la forma y al ángulo del perfil, que curvan todo el flujo alrededor. El ala también desvía aire hacia abajo; la diferencia de presión y la tercera ley de Newton describen el mismo fenómeno desde dos ángulos.</p>
+        <p class="note">Modelo: flujo potencial ideal alrededor de un perfil de Joukowski con condición de Kutta en el borde de salida. Es exacto para fluido ideal y reproduce bien la tendencia real a ángulos moderados.</p>
+      </div>
+    </div>
+  </section>
+<section class="legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Simulación didáctica basada en flujo potencial ideal alrededor de un perfil de Joukowski con condición de Kutta. No representa viscosidad, capa límite, pérdida (stall) ni efectos tridimensionales del ala; la sustentación calculada corresponde a un perfil ideal y suele superar la real.</p>
+    <p>La superficie alar y el peso son valores típicos de una avioneta ligera de cuatro plazas y no corresponden a una aeronave certificada concreta. No usar para diseño, certificación ni operación de aeronaves. El autor no asume responsabilidad por decisiones derivadas del uso de esta herramienta.</p>
+    <p>Los cálculos se ejecutan en este dispositivo; la página no envía datos a ningún servidor. Necesita conexión a internet para cargar las tipografías y la librería Three.js.</p><p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+<li class="grp">Bibliografía</li>
+<li>Anderson, J. D. – Fundamentals of Aerodynamics. McGraw-Hill.</li>
+<li>Babinsky, H. (2003) – How do wings work? Physics Education 38(6).</li>
+<li class="grp">Divulgación técnica</li>
+<li><a href="https://www.grc.nasa.gov/www/k-12/airplane/lift1.html" target="_blank" rel="noopener">NASA Glenn Research Center – What is Lift?</a></li>
+<li><a href="https://www.grc.nasa.gov/www/k-12/airplane/wrong1.html" target="_blank" rel="noopener">NASA Glenn Research Center – Incorrect Lift Theory (tiempo de tránsito igual)</a></li>
+<li class="grp">Librerías</li>
+<li><a href="https://threejs.org" target="_blank" rel="noopener">Three.js – librería de gráficos 3D (licencia MIT)</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer class="sitefoot">
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+const RHO=1.225,S_REF=16.2,WEIGHT=10900,SPAN=4.2;
+const st={alpha:5*Math.PI/180,ey:0.08,ex:0.09,U:55,speed:1,playing:!matchMedia('(prefers-reduced-motion: reduce)').matches};
+let mux,muy,a,beta,Gam,ca,sa;
+function setFlow(){
+  mux=-st.ex; muy=st.ey; a=Math.hypot(1+st.ex,st.ey); beta=Math.atan2(st.ey,1+st.ex);
+  Gam=4*Math.PI*a*Math.sin(st.alpha+beta); ca=Math.cos(st.alpha); sa=Math.sin(st.alpha);
+}
+/* Velocidad compleja w = dW/dz en el plano físico, para un punto ζ del plano del círculo (U = 1) */
+const W=[0,0];
+function wAt(zr,zi){
+  const dr=zr-mux, di=zi-muy, m2=dr*dr+di*di;
+  const d2r=dr*dr-di*di, d2i=2*dr*di, n2=d2r*d2r+d2i*d2i;
+  const nr=a*a*ca, ni=a*a*sa;
+  const t2r=(nr*d2r+ni*d2i)/n2, t2i=(ni*d2r-nr*d2i)/n2;
+  const k=Gam/(2*Math.PI);
+  const Fr=ca-t2r+k*di/m2, Fi=-sa-t2i+k*dr/m2;
+  const zr2=zr*zr-zi*zi, zi2=2*zr*zi, q=zr2*zr2+zi2*zi2;
+  const Jr=1-zr2/q, Ji=zi2/q;
+  const jd=Jr*Jr+Ji*Ji;
+  W[0]=(Fr*Jr+Fi*Ji)/jd; W[1]=(Fi*Jr-Fr*Ji)/jd;
+  return W;
+}
+/* Inversa de Joukowski: z → ζ fuera del círculo. Devuelve false si el punto está dentro del ala */
+const Z=[0,0];
+function inv(xr,xi){
+  const sr0=xr*xr-xi*xi-4, si0=2*xr*xi, m=Math.hypot(sr0,si0);
+  let sr=Math.sqrt(Math.max(0,(m+sr0)/2)), si=Math.sqrt(Math.max(0,(m-sr0)/2)); if(si0<0) si=-si;
+  const z1r=(xr+sr)/2, z1i=(xi+si)/2, z2r=(xr-sr)/2, z2i=(xi-si)/2;
+  const d1=Math.hypot(z1r-mux,z1i-muy), d2=Math.hypot(z2r-mux,z2i-muy);
+  if(d1>=d2){Z[0]=z1r;Z[1]=z1i;return d1>a*1.002;}
+  Z[0]=z2r;Z[1]=z2i;return d2>a*1.002;
+}
+/* Velocidad en el plano físico (u, v) para el punto (x, y) */
+const V=[0,0];
+function vel(x,y){ if(!inv(x,y)) return false; const w=wAt(Z[0],Z[1]); V[0]=w[0]; V[1]=-w[1]; return true; }
+
+/* ---------- Escena ---------- */
+const canvas=document.getElementById('c'), stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x0a1120,24,50);
+const camera=new THREE.PerspectiveCamera(40,1,0.1,200);
+const controls=new THREE.OrbitControls(camera,canvas); controls.enableDamping=true; controls.minDistance=6; controls.maxDistance=36;
+function setView(side){ if(side) camera.position.set(0.3,0.3,17.5); else camera.position.set(-7.5,5.5,13); controls.target.set(0.3,0.2,0); controls.update(); }
+setView(false);
+scene.add(new THREE.HemisphereLight(0xbcdcff,0x0a1120,0.85));
+const dl=new THREE.DirectionalLight(0xffffff,1.0); dl.position.set(4,10,7); scene.add(dl);
+const grid=new THREE.GridHelper(44,44,0x2a3d63,0x16223a); grid.position.y=-4; scene.add(grid);
+
+let wing,arrows,streams,liftArrow,contour=[],cp=[],iLE=0,xLE=0,chord=4,CL=0;
+const lowC=new THREE.Color(0x3fd3ff), midC=new THREE.Color(0x2a4a7a), highC=new THREE.Color(0xff5a3c);
+function cpColor(c){ // c<0 succión, c>0 presión
+  const t=Math.max(-1,Math.min(1,c<0?c/2.2:c));
+  return t<0? midC.clone().lerp(lowC,-t) : midC.clone().lerp(highC,t);
+}
+function disposeObj(o){ if(!o) return; scene.remove(o); o.traverse(n=>{n.geometry&&n.geometry.dispose(); if(n.material&&n.material.dispose) n.material.dispose();}); }
+
+function buildWing(){
+  [wing,arrows,streams,liftArrow].forEach(disposeObj);
+  const M=180; contour=[]; cp=[];
+  for(let i=0;i<M;i++){
+    const th=-beta+2*Math.PI*(i+0.5)/M;
+    const zr=mux+a*Math.cos(th), zi=muy+a*Math.sin(th);
+    const q=zr*zr+zi*zi, x=zr+zr/q, y=zi-zi/q;
+    const w=wAt(zr,zi); const sp2=w[0]*w[0]+w[1]*w[1];
+    contour.push([x,y]); cp.push(1-sp2);
+  }
+  iLE=0; xLE=1e9; contour.forEach((p,i)=>{if(p[0]<xLE){xLE=p[0];iLE=i;}});
+  chord=2-xLE;
+  // superficie extruida coloreada por presión
+  const pos=[],col=[],idx=[];
+  contour.forEach((p,i)=>{const c=cpColor(cp[i]); for(const z of [-SPAN,SPAN]){pos.push(p[0],p[1],z);col.push(c.r,c.g,c.b);} });
+  for(let i=0;i<M;i++){const j=(i+1)%M,a0=2*i,a1=2*i+1,b0=2*j,b1=2*j+1; idx.push(a0,b0,a1, a1,b0,b1);}
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setIndex(idx); g.computeVertexNormals();
+  wing=new THREE.Group();
+  wing.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.35,metalness:0.25,side:THREE.DoubleSide,emissive:0x0a1426})));
+  const shape=new THREE.Shape(contour.map(p=>new THREE.Vector2(p[0],p[1])));
+  const capMat=new THREE.MeshStandardMaterial({color:0x1b2a46,roughness:0.5,metalness:0.4,side:THREE.DoubleSide});
+  for(const z of [-SPAN,SPAN]){const cap=new THREE.Mesh(new THREE.ShapeGeometry(shape),capMat); cap.position.z=z; wing.add(cap);}
+  // perfil resaltado en la punta
+  const edge=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(contour.map(p=>new THREE.Vector3(p[0],p[1],SPAN+0.01))),new THREE.LineBasicMaterial({color:0xe7eef9}));
+  wing.add(edge);
+  scene.add(wing);
+
+  // flechas de presión en el plano de la punta
+  arrows=new THREE.Group();
+  const pick=[];
+  for(let k=1;k<=12;k++) pick.push(Math.round(iLE*(k/13)));               // extradós
+  for(let k=1;k<=12;k++) pick.push(Math.round(iLE+(M-iLE)*(k/13)));       // intradós
+  pick.push(iLE);
+  pick.forEach(i=>{
+    const p=contour[i], pa=contour[(i-1+M)%M], pb=contour[(i+1)%M];
+    let nx=pb[1]-pa[1], ny=-(pb[0]-pa[0]); const nl=Math.hypot(nx,ny); nx/=nl; ny/=nl;
+    const c=cp[i], L=Math.min(1.8,Math.abs(c)*0.55); if(L<0.06) return;
+    const dir=new THREE.Vector3(c<0?nx:-nx,c<0?ny:-ny,0);
+    const org=c<0? new THREE.Vector3(p[0],p[1],SPAN+0.06) : new THREE.Vector3(p[0]+nx*L,p[1]+ny*L,SPAN+0.06);
+    arrows.add(new THREE.ArrowHelper(dir,org,L,c<0?0x3fd3ff:0xff5a3c,Math.min(0.22,L*0.4),0.12));
+  });
+  scene.add(arrows);
+
+  // C_L ideal (Kutta–Joukowski): C_L = 2Γ/(U·c)
+  CL=2*Gam/chord;
+  const xq=xLE+chord*0.25;
+  let ytop=0; contour.slice(0,iLE).forEach(p=>{if(Math.abs(p[0]-xq)<0.15) ytop=Math.max(ytop,p[1]);});
+  liftArrow=new THREE.ArrowHelper(new THREE.Vector3(0,CL>=0?1:-1,0),new THREE.Vector3(xq,ytop+0.1,0),Math.max(0.2,Math.min(4.2,Math.abs(CL)*1.9)),0xf5d76e,0.5,0.32);
+  liftArrow.line.material.linewidth=3;
+  scene.add(liftArrow);
+
+  // líneas de corriente
+  streams=new THREE.Group();
+  for(const zp of [SPAN+0.25,-SPAN-0.25]){
+    for(let s=0;s<19;s++){
+      let x=-8.5, y=-3.4+6.8*s/18; const pts=[],cols=[];
+      for(let n=0;n<900 && x<9.5;n++){
+        if(!vel(x,y)) break;
+        const sp=Math.hypot(V[0],V[1]);
+        pts.push(x,y,zp); const c=speedColor(sp); cols.push(c[0],c[1],c[2]);
+        const h=0.05/Math.max(sp,0.05);
+        const mx=x+V[0]*h*0.5, my=y+V[1]*h*0.5;
+        if(!vel(mx,my)) break;
+        const sp2=Math.max(Math.hypot(V[0],V[1]),0.05);
+        x+=V[0]*0.05/sp2; y+=V[1]*0.05/sp2;
+      }
+      if(pts.length<6) continue;
+      const lg=new THREE.BufferGeometry();
+      lg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+      lg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+      streams.add(new THREE.Line(lg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:zp>0?0.85:0.3})));
+    }
+  }
+  scene.add(streams);
+}
+
+const ramp=[[0x2b,0x6b,0xff],[0x18,0xd6,0xe0],[0x7c,0xf2,0x6a],[0xff,0xd2,0x3c],[0xff,0x4a,0x2a]].map(c=>c.map(v=>v/255));
+const RC=[0,0,0];
+function speedColor(s){ // 0,4× → 1,8×
+  let t=(s-0.4)/1.4; t=Math.min(1,Math.max(0,t))*(ramp.length-1);
+  const i=Math.min(ramp.length-2,Math.floor(t)), f=t-i;
+  for(let j=0;j<3;j++) RC[j]=ramp[i][j]+(ramp[i+1][j]-ramp[i][j])*f; return RC;
+}
+
+/* ---------- Partículas ---------- */
+const N=2600, XA=-8.5, XB=9.5, YH=3.6;
+const pp=new Float32Array(N*3), pc=new Float32Array(N*3);
+const pg=new THREE.BufferGeometry();
+pg.setAttribute('position',new THREE.BufferAttribute(pp,3)); pg.setAttribute('color',new THREE.BufferAttribute(pc,3));
+const sprite=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');
+  const gr=x.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.35,'rgba(255,255,255,.8)');gr.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
+const points=new THREE.Points(pg,new THREE.PointsMaterial({size:0.14,map:sprite,vertexColors:true,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+scene.add(points);
+function spawn(i,anyX){
+  for(let t=0;t<20;t++){
+    const x=anyX?XA+Math.random()*(XB-XA):XA+Math.random()*0.4, y=(Math.random()*2-1)*YH;
+    if(inv(x,y)){pp[i*3]=x;pp[i*3+1]=y;pp[i*3+2]=(Math.random()*2-1)*SPAN;return;}
+  }
+  pp[i*3]=XA;pp[i*3+1]=YH;
+}
+
+/* Línea de humo: marcadores blancos soltados en vertical */
+const NS=44, sp3=new Float32Array(NS*3);
+const sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(sp3,3));
+const smoke=new THREE.Points(sg,new THREE.PointsMaterial({size:0.34,map:sprite,color:0xffffff,transparent:true,depthWrite:false}));
+smoke.visible=false; scene.add(smoke);
+const sLine=new THREE.Line(sg,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.55}));
+sLine.visible=false; scene.add(sLine);
+function launchSmoke(){
+  for(let i=0;i<NS;i++){sp3[i*3]=-6.5; sp3[i*3+1]=-1.9+3.8*i/(NS-1); sp3[i*3+2]=SPAN+0.35;}
+  sg.attributes.position.needsUpdate=true; smoke.visible=sLine.visible=true;
+  if(!st.playing){st.playing=true;$('play').textContent='Pausar';}
+}
+
+/* ---------- Gráfico de Cp ---------- */
+const cpc=document.getElementById('cp'), cx=cpc.getContext('2d');
+function drawCp(){
+  const dpr=Math.min(devicePixelRatio,2), w=cpc.clientWidth, h=cpc.clientHeight;
+  cpc.width=w*dpr; cpc.height=h*dpr; cx.setTransform(dpr,0,0,dpr,0,0); cx.clearRect(0,0,w,h);
+  const css=getComputedStyle(document.documentElement);
+  const cMuted=css.getPropertyValue('--muted'), cLine=css.getPropertyValue('--line'), cLow=css.getPropertyValue('--low'), cHigh=css.getPropertyValue('--high');
+  const L=38,R=10,T=10,B=26, pw=w-L-R, ph=h-T-B;
+  let top=1; cp.forEach(c=>top=Math.max(top,-c)); top=Math.min(Math.ceil(top),6);
+  const yMin=-1, X=v=>L+v*pw, Y=v=>T+(top-v)/(top-yMin)*ph;
+  cx.font='11px "IBM Plex Mono", monospace'; cx.fillStyle=cMuted; cx.strokeStyle=cLine; cx.lineWidth=1;
+  for(let v=yMin;v<=top;v++){cx.beginPath();cx.moveTo(L,Y(v));cx.lineTo(L+pw,Y(v));cx.stroke(); cx.textAlign='right';cx.fillText(v,L-6,Y(v)+4);}
+  cx.textAlign='center'; [0,0.25,0.5,0.75,1].forEach(v=>cx.fillText(v.toLocaleString('es'),X(v),h-8));
+  cx.save(); cx.translate(10,T+ph/2); cx.rotate(-Math.PI/2); cx.fillText('−Cp',0,0); cx.restore();
+  cx.textAlign='right'; cx.fillText('x/c',L+pw,h-8);
+  const seg=(from,to,color)=>{
+    cx.strokeStyle=color; cx.lineWidth=2.4; cx.beginPath();
+    for(let i=from;i<=to;i++){const p=contour[i%contour.length]; const xv=(p[0]-xLE)/chord, yv=Math.max(yMin,Math.min(top,-cp[i%cp.length])); i===from?cx.moveTo(X(xv),Y(yv)):cx.lineTo(X(xv),Y(yv));}
+    cx.stroke();
+  };
+  seg(0,iLE,cLow); seg(iLE,contour.length-1,cHigh);
+}
+
+/* ---------- Interfaz ---------- */
+const $=id=>document.getElementById(id);
+const fmt=(n,d=1)=>n.toLocaleString('es',{minimumFractionDigits:d,maximumFractionDigits:d});
+let upIdx=0, dnIdx=0;
+function update(){
+  st.alpha=+$('aoa').value*Math.PI/180; st.ey=+$('cam').value; st.U=+$('vel').value; st.speed=+$('sp').value;
+  $('aoao').textContent=fmt(+$('aoa').value)+'°';
+  $('camo').textContent=Math.round(st.ey/0.2*100)+' %';
+  $('velo').textContent=st.U+' m/s · '+Math.round(st.U*3.6)+' km/h';
+  $('spo').textContent='×'+fmt(st.speed,2);
+  setFlow(); buildWing();
+  const q=0.5*RHO*st.U*st.U;
+  let cmin=1e9; for(let i=0;i<iLE;i++) if(cp[i]<cmin){cmin=cp[i];upIdx=i;}
+  let sum=0,n=0; for(let i=iLE+1;i<cp.length;i++){sum+=cp[i];n++;} const cdn=sum/n;
+  dnIdx=Math.round(iLE+(cp.length-iLE)*0.55);
+  $('vUp').textContent=fmt(st.U*Math.sqrt(Math.max(0,1-cmin)))+' m/s';
+  $('pUp').textContent=fmt(q*cmin/1000,2)+' kPa';
+  $('pDn').textContent=(cdn>=0?'+':'')+fmt(q*cdn/1000,2)+' kPa';
+  $('q').textContent=fmt(q/1000,2)+' kPa';
+  $('cl').textContent=fmt(CL,2);
+  const L=q*S_REF*CL;
+  $('lift').textContent=fmt(L/1000)+' kN';
+  const scale=Math.max(WEIGHT*2,L*1.05);
+  $('fill').style.width=Math.max(0,L)/scale*100+'%';
+  $('wline').style.left=WEIGHT/scale*100+'%';
+  $('ratio').textContent=L>=WEIGHT?'El avión vuela ('+fmt(L/WEIGHT,2)+'×)':'No alcanza ('+fmt(Math.max(0,L)/WEIGHT,2)+'×)';
+  $('ratio').style.color=L>=WEIGHT?'var(--lift)':'var(--high)';
+  $('stall').hidden=+$('aoa').value<=13;
+  for(let i=0;i<N;i++) if(!inv(pp[i*3],pp[i*3+1])) spawn(i,true);
+  drawCp();
+}
+['aoa','cam','vel','sp'].forEach(id=>$(id).addEventListener('input',update));
+$('play').addEventListener('click',()=>{st.playing=!st.playing;$('play').textContent=st.playing?'Pausar':'Reanudar';});
+let side=false;
+$('view').addEventListener('click',()=>{side=!side;setView(side);$('view').textContent=side?'Vista 3D':'Vista de perfil';});
+$('smoke').addEventListener('click',launchSmoke);
+$('reset').addEventListener('click',()=>{$("aoa").value=3;$("cam").value=0.04;$("vel").value=45;$('sp').value=1;side=false;setView(false);$('view').textContent='Vista de perfil';smoke.visible=sLine.visible=false;update();});
+$('play').textContent=st.playing?'Pausar':'Reanudar';
+
+setFlow(); for(let i=0;i<N;i++) spawn(i,true);
+update();
+
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();drawCp();}
+addEventListener('resize',resize); resize();
+
+const tmp=new THREE.Vector3();
+function place(el,x,y,z,dx,dy){
+  tmp.set(x,y,z).project(camera);
+  const sx=(tmp.x+1)/2*stage.clientWidth, sy=(1-tmp.y)/2*stage.clientHeight;
+  el.style.transform=`translate(${sx}px,${sy}px) translate(${dx}%,${dy}%)`;
+  el.style.visibility=tmp.z<1?'visible':'hidden';
+}
+
+const VIS=2.6; let last=performance.now();
+function frame(now){
+  const dt=Math.min(0.04,(now-last)/1000); last=now;
+  const h=dt*VIS*st.speed;
+  for(let i=0;i<N;i++){
+    let x=pp[i*3], y=pp[i*3+1];
+    if(st.playing){
+      if(!vel(x,y)){spawn(i,false);continue;}
+      const mx=x+V[0]*h*0.5, my=y+V[1]*h*0.5;
+      if(!vel(mx,my)){spawn(i,false);continue;}
+      const s=Math.hypot(V[0],V[1]), cap=Math.min(1,0.25/(s*h+1e-6));
+      x+=V[0]*h*cap; y+=V[1]*h*cap;
+      if(x>XB||Math.abs(y)>YH+0.5){spawn(i,false);continue;}
+      pp[i*3]=x; pp[i*3+1]=y;
+    }
+    if(vel(x,y)){const c=speedColor(Math.hypot(V[0],V[1])); pc[i*3]=c[0];pc[i*3+1]=c[1];pc[i*3+2]=c[2];}
+  }
+  pg.attributes.position.needsUpdate=true; pg.attributes.color.needsUpdate=true;
+
+  if(smoke.visible && st.playing){
+    for(let i=0;i<NS;i++){
+      let x=sp3[i*3], y=sp3[i*3+1]; if(x>XB) continue;
+      for(let k=0;k<3;k++){ // subpasos para seguir bien el borde
+        if(!vel(x,y)) break; const hh=h/3;
+        const mx=x+V[0]*hh*0.5,my=y+V[1]*hh*0.5; if(!vel(mx,my)) break;
+        x+=V[0]*hh; y+=V[1]*hh;
+      }
+      sp3[i*3]=x; sp3[i*3+1]=y;
+    }
+    sg.attributes.position.needsUpdate=true;
+  }
+
+  const q=0.5*RHO*st.U*st.U;
+  const pu=contour[upIdx], pd=contour[dnIdx];
+  place($('tUp'),pu[0],pu[1]+0.55,SPAN,-50,-100);
+  $('tUp').innerHTML=`<b>Extradós</b><br>V ${fmt(st.U*Math.sqrt(Math.max(0,1-cp[upIdx])))} m/s<br>P ${fmt(q*cp[upIdx],0)} Pa`;
+  place($('tDn'),pd[0],pd[1]-0.6,SPAN,-50,0);
+  $('tDn').innerHTML=`<b>Intradós</b><br>V ${fmt(st.U*Math.sqrt(Math.max(0,1-cp[dnIdx])))} m/s<br>P ${cp[dnIdx]>=0?'+':''}${fmt(q*cp[dnIdx],0)} Pa`;
+  const la=liftArrow.position, ll=Math.max(0.2,Math.min(4.2,Math.abs(CL)*1.9));
+  place($('tL'),la.x,la.y+(CL>=0?ll:-ll)+0.25,0,-50,-100);
+  $('tL').innerHTML=`<b>Sustentación</b> C<sub>L</sub> ${fmt(CL,2)}`;
+
+  controls.update(); renderer.render(scene,camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generador de Mapas Base</title>
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Mapas base en PDF georreferenciado (Geospatial PDF, ISO 32000) para Avenza Maps, con capas vectoriales, imagen satelital Esri u OpenStreetMap, cuadrícula, norte, escala y leyenda.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:18px 28px}
+.wrap{max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+header h1{font-family:var(--f-disp); font-weight:800; font-size:clamp(22px,4vw,30px); letter-spacing:.04em; color:var(--brand); margin:0; line-height:1.05; text-transform:uppercase; text-wrap:balance}
+header h1 .u{color:var(--accent)}
+.sub{color:var(--muted); margin:8px 0 0; font-size:13.5px; max-width:84ch}
+.by{font:500 12px var(--f-mono); margin-top:8px}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+.layout{display:grid; grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr); gap:16px; align-items:start}
+@media (max-width:940px){.layout{grid-template-columns:minmax(0,1fr)}}
+.left{position:sticky; top:12px; display:flex; flex-direction:column; gap:10px; min-width:0}
+@media (max-width:940px){.left{position:static}}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+#map{height:min(72vh,640px); border-radius:8px; z-index:0; background:var(--field)}
+@media (max-width:640px){#map{height:360px}}
+.mapinfo{display:flex; flex-wrap:wrap; gap:6px 14px; padding:10px 12px; font:500 12px var(--f-mono); color:var(--muted)}
+.mapinfo b{color:var(--ink)}
+details.grp{border-top:1px solid var(--line)}
+details.grp:first-of-type{border-top:0}
+details.grp > summary{list-style:none; cursor:pointer; padding:11px 14px; display:flex; align-items:center; gap:8px; font:700 12.5px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand)}
+details.grp > summary::-webkit-details-marker{display:none}
+details.grp > summary::after{content:"+"; margin-left:auto; font:500 16px var(--f-mono); color:var(--muted)}
+details.grp[open] > summary::after{content:"–"}
+details.grp > summary .n{font:500 11.5px var(--f-mono); color:var(--accent)}
+.rows{padding:0 14px 14px; display:flex; flex-direction:column; gap:10px}
+.row{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,210px); gap:10px; align-items:center}
+.row > label{font-size:13px}
+.f{display:flex; flex-direction:column; gap:4px; min-width:0}
+.f label{font-size:12px; color:var(--muted)}
+select,input[type=text],input[type=number]{width:100%; font:500 13px var(--f-body); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:7px 8px; min-width:0}
+input[type=color]{width:42px; height:32px; padding:2px; border:1px solid var(--line); border-radius:5px; background:var(--field)}
+input[type=range]{accent-color:var(--accent)}
+.btns{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.btn{font:600 12.5px var(--f-body); padding:7px 11px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.sec2{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn.pri{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font:700 13px var(--f-disp); letter-spacing:.06em; text-transform:uppercase; padding:11px 16px}
+.btn.sm{padding:4px 8px; font-size:12px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.tog{display:flex; gap:4px}
+.tog button{flex:1; font:600 12px var(--f-body); padding:7px 6px; border:1px solid var(--line); background:var(--field); color:var(--ink); border-radius:5px; cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.drop{border:2px dashed var(--line); border-radius:8px; background:var(--field); padding:14px; text-align:center; cursor:pointer; font-size:12.5px; color:var(--muted)}
+.drop b{display:block; font:700 12.5px var(--f-disp); letter-spacing:.05em; text-transform:uppercase; color:var(--brand); margin-bottom:3px}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--brandsoft)}
+.layer{border:1px solid var(--line); border-radius:6px; padding:10px; display:flex; flex-direction:column; gap:8px; background:var(--panel)}
+.layer .hd{display:flex; gap:6px; align-items:center}
+.layer .hd input[type=text]{font-weight:600}
+.layer .grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px}
+@media (max-width:480px){.layer .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.layer .meta{font:400 11.5px var(--f-mono); color:var(--muted)}
+.msgs{display:flex; flex-direction:column; gap:6px}
+.msg{font-size:12.5px; padding:7px 10px; border-radius:5px; border-left:3px solid var(--brand); background:var(--field)}
+.msg[data-l="warn"]{border-left-color:var(--warn); background:var(--warnbg)}
+.msg[data-l="err"],.msg[data-l="bad"]{border-left-color:var(--bad); background:var(--badbg)}
+.msg[data-l="ok"]{border-left-color:var(--ok); background:var(--okbg)}
+.note{font-size:12px; color:var(--muted); margin:0}
+.prog{height:8px; background:var(--field); border-radius:4px; overflow:hidden; border:1px solid var(--line)}
+.prog > div{height:100%; width:0; background:var(--accent); transition:width .2s}
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; font-size:12.5px; display:flex; flex-direction:column; gap:5px}
+.srcs li{color:var(--muted); overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Generador de <span class="u">mapas base</span></h1>
+  <p class="sub">Componga un mapa con sus capas vectoriales sobre imagen satelital Esri u OpenStreetMap, con título, norte, escala gráfica, leyenda y cuadrícula de coordenadas, y descárguelo como PDF georreferenciado listo para Avenza Maps. Los archivos se procesan en su equipo.</p>
+  <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+</header>
+
+<div class="layout">
+  <div class="left">
+    <section class="panel" aria-label="Vista previa del mapa">
+      <div id="map" role="img" aria-label="Vista previa: el recuadro naranja es el área que se imprimirá"></div>
+      <div class="mapinfo" id="mapInfo"></div>
+    </section>
+    <p class="note">El recuadro naranja es el área que saldrá en el PDF. Mueva el mapa para encuadrarla; con la escala fija, el tamaño del recuadro no cambia al hacer zoom.</p>
+  </div>
+
+  <aside class="panel" aria-label="Configuración del mapa">
+    <details class="grp" open><summary><span class="n">01</span> Capas vectoriales</summary>
+      <div class="rows">
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Agregar capa"><b>Agregar capa</b>Shapefile (.zip o .shp+.dbf+.prj), KML, KMZ, GeoJSON, GPX, CSV, DXF</div>
+        <input type="file" id="file" multiple hidden accept=".zip,.shp,.shx,.dbf,.prj,.cpg,.kml,.kmz,.geojson,.json,.dxf,.gpx,.csv,.txt">
+        <div class="msgs" id="loadMsgs"></div>
+        <div id="layers" class="rows" style="padding:0"></div>
+      </div>
+    </details>
+    <details class="grp" open><summary><span class="n">02</span> Fondo</summary>
+      <div class="rows">
+        <div class="row"><label for="pBase">Mapa de fondo</label>
+          <select id="pBase"><option value="esriref">Esri World Imagery + calles y lugares</option><option value="esri">Esri World Imagery</option><option value="osm">OpenStreetMap</option></select></div>
+      </div>
+    </details>
+    <details class="grp" open><summary><span class="n">03</span> Hoja y escala</summary>
+      <div class="rows">
+        <div class="row"><label for="pSheet">Tamaño de hoja</label><select id="pSheet"><option value="A3">A3 (420 × 297 mm)</option><option value="A2">A2 (594 × 420 mm)</option><option value="A1">A1 (841 × 594 mm)</option></select></div>
+        <div class="row"><label>Orientación</label><div class="tog" id="pOrient"><button type="button" data-v="L" aria-pressed="true">Horizontal</button><button type="button" data-v="P" aria-pressed="false">Vertical</button></div></div>
+        <div class="row"><label for="pScale">Escala</label><select id="pScale"></select></div>
+        <div class="btns"><button class="btn" type="button" id="bFit">Encuadrar todas las capas</button><span class="note" id="fitNote"></span></div>
+      </div>
+    </details>
+    <details class="grp" open><summary><span class="n">04</span> Elementos del mapa</summary>
+      <div class="rows">
+        <div class="f"><label for="pTitle">Título (descripción breve)</label><input type="text" id="pTitle" maxlength="140" placeholder="Ej.: Levantamiento topográfico · Sector Norte"></div>
+        <div class="f"><label for="pAuthor">Elaborado por (opcional)</label><input type="text" id="pAuthor" maxlength="80"></div>
+        <div class="row"><label for="pGrid">Cuadrícula de coordenadas</label><select id="pGrid"><option value="utm">UTM (WGS 84 / SIRGAS)</option><option value="geo">Geográficas (lat / lon)</option><option value="none">Sin cuadrícula</option></select></div>
+        <div class="row" id="rGridInt"><label for="pGridInt">Intervalo de la cuadrícula</label><select id="pGridInt"><option value="auto">Automático</option></select></div>
+      </div>
+    </details>
+    <details class="grp" open><summary><span class="n">05</span> Generar PDF georreferenciado</summary>
+      <div class="rows">
+        <p class="note" id="outInfo"></p>
+        <div class="btns"><button class="btn pri" type="button" id="bGo">Generar PDF para Avenza</button></div>
+        <div class="prog" id="prog" hidden><div></div></div>
+        <div class="msgs" id="outMsgs"></div>
+      </div>
+    </details>
+  </aside>
+</div>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Herramienta de apoyo para producir mapas base de campo. El PDF se georreferencia según la extensión geoespacial de ISO 32000 (Geospatial PDF), en WGS 84 / Pseudo-Mercator (EPSG 3857), la proyección de las teselas de fondo. La exactitud de la posición depende de la precisión de las capas cargadas, de la georreferenciación de la imagen del proveedor y del GPS del dispositivo; no reemplaza un levantamiento ni sirve para delimitar linderos.</p>
+    <p>Las capas en datums locales se llevan a WGS 84 con los mismos parámetros del Conversor de Formatos (PATVEN-98 para La Canoa, IGM para PSAD56 en Ecuador continental). SIRGAS-ECU, REGVEN y WGS 84 se tratan como equivalentes a nivel métrico. La cuadrícula UTM se dibuja en WGS 84.</p>
+    <p>La imagen de fondo pertenece a Esri y sus proveedores o a los colaboradores de OpenStreetMap, sujeta a sus términos de uso; la atribución se imprime en el mapa. Su fecha puede no coincidir con el estado actual del terreno. El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+      <li class="grp">PDF georreferenciado</li>
+      <li><a href="https://support.avenzamaps.com/hc/en-us/articles/4961897108628" target="_blank" rel="noopener">Avenza Maps — Formatos de mapa compatibles (Geospatial PDF)</a></li>
+      <li><a href="https://gdal.org/drivers/raster/pdf.html" target="_blank" rel="noopener">GDAL — Controlador PDF (georreferenciación ISO 32000)</a></li>
+      <li><a href="https://epsg.io/3857" target="_blank" rel="noopener">EPSG 3857 — WGS 84 / Pseudo-Mercator</a></li>
+      <li class="grp">Geodesia</li>
+      <li><a href="https://doi.org/10.1007/s00190-011-0445-3" target="_blank" rel="noopener">Karney (2011) — Transverse Mercator with an accuracy of a few nanometers</a></li>
+      <li>IGVSB / LGFS — PATVEN-98 · <a href="https://epsg.io/3990" target="_blank" rel="noopener">IGM Ecuador — PSAD56 → SIRGAS (EPSG 3990)</a></li>
+      <li class="grp">Cartografía de fondo</li>
+      <li><a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri — World Imagery</a> · <a href="https://www.arcgis.com/home/item.html?id=94f838a535334cf1aa061846514b77c7" target="_blank" rel="noopener">World Transportation</a></li>
+      <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noopener">Política de uso de teselas</a></li>
+      <li class="grp">Librerías</li>
+      <li><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a> · <a href="https://github.com/parallax/jsPDF" target="_blank" rel="noopener">jsPDF</a> · <a href="https://pdf-lib.js.org" target="_blank" rel="noopener">pdf-lib</a> · <a href="https://stuk.github.io/jszip/" target="_blank" rel="noopener">JSZip</a></li>
+    </ul>
+  </div>
+</section>
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   GEODESIA
+   ===================================================================== */
+const D2R = Math.PI/180, S2R = Math.PI/(180*3600);
+const ELL = {
+  WGS84:{a:6378137, f:1/298.257223563, name:'WGS 84'},
+  GRS80:{a:6378137, f:1/298.257222101, name:'GRS 1980'},
+  INTL: {a:6378388, f:1/297, name:'Internacional 1924 (Hayford)'}
+};
+const DATUM = {
+  WGS84: {name:'WGS 84', ell:'WGS84', esri:['GCS_WGS_1984','D_WGS_1984','WGS_1984',6378137,298.257223563]},
+  SIRGAS:{name:'SIRGAS-ECU (SIRGAS 1995)', ell:'GRS80', esri:['GCS_SIRGAS','D_SIRGAS','GRS_1980',6378137,298.257222101]},
+  REGVEN:{name:'REGVEN (SIRGAS)', ell:'GRS80', esri:['GCS_REGVEN','D_REGVEN','GRS_1980',6378137,298.257222101]},
+  CANOA: {name:'La Canoa (PSAD56) · Venezuela', ell:'INTL', esri:['GCS_La_Canoa','D_La_Canoa','International_1924',6378388,297]},
+  PSADEC:{name:'PSAD56 · Ecuador continental', ell:'INTL', esri:['GCS_Provisional_S_American_1956','D_Provisional_S_American_1956','International_1924',6378388,297]}
+};
+
+// PATVEN-98 (IGVSB/LGFS) — Molodensky-Badekas, convención Coordinate Frame (igual que el Transformador de Datum)
+const PATVEN = { tX:-270.933, tY:115.599, tZ:-360.226, rX:-5.266*S2R, rY:-1.238*S2R, rZ:2.381*S2R, dS:-5.109e-6,
+  Xp:2464351.59, Yp:-5783466.61, Zp:974809.81 };
+// IGM Ecuador PSAD56 → SIRGAS (EPSG 3971/3990) — Coordinate Frame, 7 parámetros, sin punto de rotación
+const IGMEC = { tX:-60.310, tY:245.935, tZ:31.008, rX:-12.324*S2R, rY:-3.755*S2R, rZ:7.370*S2R, dS:0.447e-6,
+  Xp:0, Yp:0, Zp:0 };
+
+function geo2cart(lat, lon, h, ell){
+  const p = lat*D2R, l = lon*D2R, e2 = ell.f*(2-ell.f);
+  const N = ell.a/Math.sqrt(1-e2*Math.sin(p)**2);
+  return [(N+h)*Math.cos(p)*Math.cos(l), (N+h)*Math.cos(p)*Math.sin(l), (N*(1-e2)+h)*Math.sin(p)];
+}
+function cart2geo(X, Y, Z, ell){
+  const e2 = ell.f*(2-ell.f), lon = Math.atan2(Y,X), p = Math.hypot(X,Y);
+  let lat = Math.atan2(Z, p*(1-e2)), N, h = 0;
+  for(let i=0;i<8;i++){ N = ell.a/Math.sqrt(1-e2*Math.sin(lat)**2); h = p/Math.cos(lat)-N; lat = Math.atan2(Z, p*(1-e2*N/(N+h))); }
+  return [lat/D2R, lon/D2R, h];
+}
+function simFwd(X,Y,Z,P){
+  const dX=X-P.Xp, dY=Y-P.Yp, dZ=Z-P.Zp, M=1+P.dS;
+  return [P.Xp+P.tX+M*(dX+P.rZ*dY-P.rY*dZ), P.Yp+P.tY+M*(-P.rZ*dX+dY+P.rX*dZ), P.Zp+P.tZ+M*(P.rY*dX-P.rX*dY+dZ)];
+}
+function simInv(X,Y,Z,P){
+  const M=1+P.dS, R=[1,P.rZ,-P.rY, -P.rZ,1,P.rX, P.rY,-P.rX,1].map(v=>v*M);
+  const [a,b,c,d,e,f,g,h,i]=R;
+  const A=e*i-f*h, B=-(d*i-f*g), C=d*h-e*g, Dd=-(b*i-c*h), E=a*i-c*g, F=-(a*h-b*g), G=b*f-c*e, H=-(a*f-c*d), I=a*e-b*d;
+  const det=a*A+b*B+c*C;
+  const bx=X-P.Xp-P.tX, by=Y-P.Yp-P.tY, bz=Z-P.Zp-P.tZ;
+  return [P.Xp+(A*bx+Dd*by+G*bz)/det, P.Yp+(B*bx+E*by+H*bz)/det, P.Zp+(C*bx+F*by+I*bz)/det];
+}
+// Datum → pivote (GRS80/WGS84 geográficas) y viceversa. Solo horizontal (h = 0).
+function toPivot(datum, lat, lon){
+  if(datum==='CANOA' || datum==='PSADEC'){
+    const P = datum==='CANOA' ? PATVEN : IGMEC;
+    const c = simFwd(...geo2cart(lat,lon,0,ELL.INTL), P);
+    const g = cart2geo(...c, ELL.GRS80); return [g[0], g[1]];
+  }
+  return [lat, lon];
+}
+function fromPivot(datum, lat, lon){
+  if(datum==='CANOA' || datum==='PSADEC'){
+    const P = datum==='CANOA' ? PATVEN : IGMEC;
+    const c = simInv(...geo2cart(lat,lon,0,ELL.GRS80), P);
+    let g = cart2geo(...c, ELL.INTL);
+    // Refinamiento: la operación es 2D (h = 0 en ambos sentidos); se itera para que ida y vuelta coincidan
+    for(let i=0;i<4;i++){ const f = toPivot(datum, g[0], g[1]); g = [g[0]+(lat-f[0]), g[1]+(lon-f[1])]; }
+    return [g[0], g[1]];
+  }
+  return [lat, lon];
+}
+
+// Transversa de Mercator — series de Krüger de 6.º orden (Karney 2011): exacta al mm incluso en zonas extendidas
+const TMC = new Map();
+function tmCoef(ell){
+  if(TMC.has(ell)) return TMC.get(ell);
+  const f=ell.f, n=f/(2-f), n2=n*n, n3=n2*n, n4=n3*n, n5=n4*n, n6=n5*n;
+  const c = {
+    A: ell.a/(1+n)*(1+n2/4+n4/64+n6/256), e: Math.sqrt(f*(2-f)),
+    al:[0, n/2-2*n2/3+5*n3/16+41*n4/180-127*n5/288+7891*n6/37800,
+        13*n2/48-3*n3/5+557*n4/1440+281*n5/630-1983433*n6/1935360,
+        61*n3/240-103*n4/140+15061*n5/26880+167603*n6/181440,
+        49561*n4/161280-179*n5/168+6601661*n6/7257600,
+        34729*n5/80640-3418889*n6/1995840,
+        212378941*n6/319334400],
+    be:[0, n/2-2*n2/3+37*n3/96-n4/360-81*n5/512+96199*n6/604800,
+        n2/48+n3/15-437*n4/1440+46*n5/105-1118711*n6/3870720,
+        17*n3/480-37*n4/840-209*n5/4480+5569*n6/90720,
+        4397*n4/161280-11*n5/504-830251*n6/7257600,
+        4583*n5/161280-108847*n6/3991680,
+        20648693*n6/638668800]
+  };
+  TMC.set(ell,c); return c;
+}
+const K0 = 0.9996;
+const cmOf = z => z*6-183;
+function utmFwd(lat, lon, zone, south, ell){
+  const c = tmCoef(ell), phi = lat*D2R, lam = (lon-cmOf(zone))*D2R, sp = Math.sin(phi);
+  const t = Math.sinh(Math.atanh(sp) - c.e*Math.atanh(c.e*sp));
+  const xp = Math.atan2(t, Math.cos(lam)), ep = Math.atanh(Math.sin(lam)/Math.sqrt(1+t*t));
+  let xi = xp, eta = ep;
+  for(let j=1;j<=6;j++){ xi += c.al[j]*Math.sin(2*j*xp)*Math.cosh(2*j*ep); eta += c.al[j]*Math.cos(2*j*xp)*Math.sinh(2*j*ep); }
+  return [500000 + K0*c.A*eta, (south?10000000:0) + K0*c.A*xi];
+}
+function utmInv(E, N, zone, south, ell){
+  const c = tmCoef(ell), xi = (N-(south?10000000:0))/(K0*c.A), eta = (E-500000)/(K0*c.A);
+  let xp = xi, ep = eta;
+  for(let j=1;j<=6;j++){ xp -= c.be[j]*Math.sin(2*j*xi)*Math.cosh(2*j*eta); ep -= c.be[j]*Math.cos(2*j*xi)*Math.sinh(2*j*eta); }
+  const tp = Math.sin(xp)/Math.sqrt(Math.sinh(ep)**2 + Math.cos(xp)**2);
+  let tau = tp, e2 = c.e*c.e;
+  for(let i=0;i<10;i++){
+    const s = Math.sinh(c.e*Math.atanh(c.e*tau/Math.sqrt(1+tau*tau)));
+    const ti = tau*Math.sqrt(1+s*s) - s*Math.sqrt(1+tau*tau);
+    const d = (tp-ti)/Math.sqrt(1+ti*ti)*(1+(1-e2)*tau*tau)/((1-e2)*Math.sqrt(1+tau*tau));
+    tau += d; if(Math.abs(d)<1e-14) break;
+  }
+  return [Math.atan(tau)/D2R, cmOf(zone) + Math.atan2(Math.sinh(ep), Math.cos(xp))/D2R];
+}
+// Factor de escala puntual (aproximación de orden 2, suficiente para advertencias)
+function scaleK(lat, lon, zone){
+  const p=lat*D2R, l=(lon-cmOf(zone))*D2R, ep2=0.00673949677548, c2=Math.cos(p)**2;
+  return K0*(1 + l*l*c2/2*(1+ep2*c2));
+}
+
+/* =====================================================================
+   CATÁLOGO DE SISTEMAS
+   ===================================================================== */
+const ZONES = {
+  WGS84:  ['15N','16N','17N','18N','19N','20N','21N','15S','16S','17S','18S'],
+  SIRGAS: ['15N','15S','16N','16S','17N','17S','18N','18S'],
+  PSADEC: ['17N','17S','18N','18S'],
+  REGVEN: ['18N','19N','20N'],
+  CANOA:  ['18N','19N','20N']
+};
+const EPSG = {
+  'WGS84:geo':4326, 'SIRGAS:geo':4170, 'REGVEN:geo':4189, 'CANOA:geo':4247, 'PSADEC:geo':4248,
+  'SIRGAS:17N':31986, 'SIRGAS:18N':31987, 'SIRGAS:17S':31992, 'SIRGAS:18S':31993,
+  'REGVEN:18N':2201, 'REGVEN:19N':2202, 'REGVEN:20N':2203,
+  'CANOA:18N':24718, 'CANOA:19N':24719, 'CANOA:20N':24720,
+  'PSADEC:17N':24817, 'PSADEC:18N':24818, 'PSADEC:17S':24877, 'PSADEC:18S':24878
+};
+function epsgOf(datum, type, zs){
+  if(datum==='WGS84' && type==='utm'){ const z=parseInt(zs,10); return (zs.endsWith('S')?32700:32600)+z; }
+  return EPSG[datum+':'+(type==='geo'?'geo':zs)] || null;
+}
+const GROUPS = [
+  ['WGS84','Global — WGS 84'],
+  ['SIRGAS','Ecuador — SIRGAS-ECU (oficial)'],
+  ['PSADEC','Ecuador — PSAD56 (continental)'],
+  ['REGVEN','Venezuela — REGVEN (oficial)'],
+  ['CANOA','Venezuela — La Canoa (PSAD56)']
+];
+const SHORT = {WGS84:'WGS 84', SIRGAS:'SIRGAS-ECU', PSADEC:'PSAD56 Ecuador', REGVEN:'REGVEN', CANOA:'La Canoa'};
+function crsParse(id){ const [datum, t] = id.split(':'); if(t==='geo') return {id, datum, type:'geo'}; if(t==='auto') return {id, datum, type:'auto'};
+  return {id, datum, type:'utm', zs:t, zone:parseInt(t,10), south:t.endsWith('S')}; }
+function crsLabel(c){
+  if(c.type==='geo') return `${SHORT[c.datum]} · geográficas (lat/lon)`;
+  if(c.type==='auto') return `${SHORT[c.datum]} · UTM automático por longitud`;
+  return `${SHORT[c.datum]} · UTM ${c.zs}`;
+}
+function crsFull(c){ const e = c.type==='auto'?null:epsgOf(c.datum,c.type,c.zs); return crsLabel(c)+(e?` (EPSG ${e})`:''); }
+function buildOptions(sel, withAuto){
+  let h='';
+  for(const [d,g] of GROUPS){
+    h += `<optgroup label="${g}">`;
+    const ids=[d+':geo'];
+    if(withAuto) ids.push(d+':auto');
+    ZONES[d].forEach(z=>ids.push(d+':'+z));
+    for(const id of ids){ const c=crsParse(id); const e=c.type==='auto'?null:epsgOf(c.datum,c.type,c.zs);
+      h += `<option value="${id}">${crsLabel(c)}${e?' · EPSG '+e:''}</option>`; }
+    h += '</optgroup>';
+  }
+  sel.innerHTML = h;
+}
+function wktOf(c){
+  const [gn,dn,sn,a,rf] = DATUM[c.datum].esri;
+  const geog = `GEOGCS["${gn}",DATUM["${dn}",SPHEROID["${sn}",${a},${rf}]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]`;
+  if(c.type==='geo') return geog;
+  const name = `${gn.replace(/^GCS_/,'')}_UTM_Zone_${c.zone}${c.south?'S':'N'}`;
+  return `PROJCS["${name}",${geog},PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",${c.south?'10000000.0':'0.0'}],PARAMETER["Central_Meridian",${cmOf(c.zone)}.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]`;
+}
+
+/* Regiones de validez */
+const BOX = {
+  VE:  {latMin:0.4, latMax:16.0, lonMin:-73.8, lonMax:-59.2},
+  EC:  {latMin:-5.2, latMax:1.7, lonMin:-81.3, lonMax:-75.0},
+  GAL: {latMin:-1.8, latMax:1.9, lonMin:-92.3, lonMax:-89.0}
+};
+const inBox = (b,lat,lon) => lat>=b.latMin && lat<=b.latMax && lon>=b.lonMin && lon<=b.lonMax;
+
+/* =====================================================================
+   MODELO DE DATOS — features: {g:{type,coordinates}, p:{...}} en coordenadas del origen
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const CLASS = {Point:'point', MultiPoint:'point', LineString:'line', MultiLineString:'line', Polygon:'poly', MultiPolygon:'poly'};
+const CLASS_NAME = {point:'puntos', line:'líneas', poly:'polígonos'};
+
+function mapGeom(g, fn){
+  const r1 = c => fn(c), r2 = a => a.map(r1), r3 = a => a.map(r2), r4 = a => a.map(r3);
+  switch(g.type){
+    case 'Point': return {type:g.type, coordinates:r1(g.coordinates)};
+    case 'MultiPoint': case 'LineString': return {type:g.type, coordinates:r2(g.coordinates)};
+    case 'MultiLineString': case 'Polygon': return {type:g.type, coordinates:r3(g.coordinates)};
+    case 'MultiPolygon': return {type:g.type, coordinates:r4(g.coordinates)};
+  }
+  return g;
+}
+function eachCoord(g, fn){ mapGeom(g, c=>{ fn(c); return c; }); }
+function countVerts(features){ let n=0; for(const f of features) eachCoord(f.g, ()=>n++); return n; }
+function fieldsOf(features, order){
+  const seen = new Set(order||[]), list = [...(order||[])];
+  for(const f of features) for(const k of Object.keys(f.p)) if(!seen.has(k)){ seen.add(k); list.push(k); }
+  return list;
+}
+
+/* =====================================================================
+   LECTORES
+   ===================================================================== */
+const extOf = n => (n.split('.').pop()||'').toLowerCase();
+const baseOf = n => n.replace(/^.*[\\/]/,'').replace(/\.[^.]+$/,'');
+function decodeText(u8, hint){
+  if(hint){ try{ return new TextDecoder(hint).decode(u8); }catch(e){} }
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(u8); }catch(e){ return new TextDecoder('windows-1252').decode(u8); }
+}
+function cpgToLabel(s){
+  s = (s||'').trim().toUpperCase();
+  if(!s) return null;
+  if(/UTF-?8|65001/.test(s)) return 'utf-8';
+  if(/1252|ANSI|LATIN|8859-1|ISO88591/.test(s)) return 'windows-1252';
+  if(/850/.test(s)) return 'ibm850';
+  return null;
+}
+
+// ---------- Shapefile ----------
+function readShp(buf){
+  const dv = new DataView(buf), out = [];
+  if(dv.getInt32(0,false)!==9994) throw new Error('El .shp no tiene un encabezado válido.');
+  const len = dv.getInt32(24,false)*2;
+  let off = 100;
+  while(off+8 <= Math.min(len, buf.byteLength)){
+    const cl = dv.getInt32(off+4,false)*2, o = off+8;
+    off = o+cl;
+    if(cl<4){ out.push(null); continue; }
+    const t = dv.getInt32(o,true);
+    if(t===0){ out.push(null); continue; }
+    const hasZ = [11,13,15,18].includes(t);
+    if(t===1||t===11||t===21){
+      const c=[dv.getFloat64(o+4,true), dv.getFloat64(o+12,true)];
+      if(t===11) c.push(dv.getFloat64(o+20,true));
+      out.push({type:'Point', coordinates:c}); continue;
+    }
+    if(t===8||t===18||t===28){
+      const np = dv.getInt32(o+36,true), pts=[];
+      for(let i=0;i<np;i++) pts.push([dv.getFloat64(o+40+16*i,true), dv.getFloat64(o+48+16*i,true)]);
+      if(hasZ){ const zo=o+40+16*np+16; for(let i=0;i<np;i++) pts[i].push(dv.getFloat64(zo+8*i,true)); }
+      out.push({type:'MultiPoint', coordinates:pts}); continue;
+    }
+    if([3,5,13,15,23,25].includes(t)){
+      const nParts=dv.getInt32(o+36,true), np=dv.getInt32(o+40,true), parts=[];
+      for(let i=0;i<nParts;i++) parts.push(dv.getInt32(o+44+4*i,true));
+      const po=o+44+4*nParts, pts=[];
+      for(let i=0;i<np;i++) pts.push([dv.getFloat64(po+16*i,true), dv.getFloat64(po+8+16*i,true)]);
+      if(hasZ){ const zo=po+16*np+16; for(let i=0;i<np;i++) pts[i].push(dv.getFloat64(zo+8*i,true)); }
+      const rings = parts.map((s,i)=>pts.slice(s, i+1<nParts?parts[i+1]:np));
+      if(t===3||t===13||t===23) out.push(rings.length===1?{type:'LineString',coordinates:rings[0]}:{type:'MultiLineString',coordinates:rings});
+      else out.push(assemblePolygons(rings));
+      continue;
+    }
+    out.push({unsupported:t});
+  }
+  return out;
+}
+const ringArea = r => { let s=0; for(let i=0;i<r.length-1;i++) s += r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1]; return s/2; };
+function pip(pt, ring){ let ins=false; for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j];
+  if(((yi>pt[1])!==(yj>pt[1])) && (pt[0] < (xj-xi)*(pt[1]-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+function assemblePolygons(rings){
+  const outers=[], holes=[];
+  for(const r of rings){ if(r.length<4) continue; (ringArea(r)<0 ? outers : holes).push(r); } // en .shp el anillo exterior va en sentido horario
+  if(!outers.length){ outers.push(...holes.splice(0)); }
+  const polys = outers.map(o=>[o]);
+  for(const h of holes){ const p = polys.find(pp=>pip(h[0], pp[0])); if(p) p.push(h); else polys.push([h]); }
+  return polys.length===1 ? {type:'Polygon', coordinates:polys[0]} : {type:'MultiPolygon', coordinates:polys};
+}
+function readDbf(buf, enc){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const n = dv.getUint32(4,true), hl = dv.getUint16(8,true), rl = dv.getUint16(10,true);
+  const fields=[]; let fo=32, pos=1;
+  while(fo < hl-1 && u8[fo]!==0x0D){
+    let name=''; for(let i=0;i<11 && u8[fo+i];i++) name+=String.fromCharCode(u8[fo+i]);
+    fields.push({name:name.trim(), type:String.fromCharCode(u8[fo+11]), len:u8[fo+16], dec:u8[fo+17], pos});
+    pos += u8[fo+16]; fo += 32;
+  }
+  const dec = new TextDecoder(enc||'utf-8'), rows=[];
+  let encUsed = enc;
+  if(!enc){ // probar UTF-8 estricto sobre todos los registros; si falla, Windows-1252
+    try{ new TextDecoder('utf-8',{fatal:true}).decode(u8.subarray(hl, hl+n*rl)); encUsed='utf-8'; }catch(e){ encUsed='windows-1252'; }
+  }
+  const D = new TextDecoder(encUsed);
+  for(let r=0;r<n;r++){
+    const ro = hl + r*rl; if(ro+rl>u8.length) break;
+    const rec = {}, del = u8[ro]===0x2A;
+    for(const f of fields){
+      const raw = D.decode(u8.subarray(ro+f.pos, ro+f.pos+f.len)).replace(/\0/g,'').trim();
+      let v = raw;
+      if(f.type==='N'||f.type==='F'){ v = raw==='' ? null : Number(raw); if(Number.isNaN(v)) v=null; }
+      else if(f.type==='L'){ v = /^[YyTt]$/.test(raw) ? true : /^[NnFf]$/.test(raw) ? false : null; }
+      else if(f.type==='D'){ v = /^\d{8}$/.test(raw) ? `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6)}` : (raw||null); }
+      rec[f.name] = v;
+    }
+    rows.push(del?null:rec);
+  }
+  return {fields, rows, enc:encUsed};
+}
+
+// ---------- KML ----------
+const kids = (el, name) => Array.from(el.children).filter(c=>c.localName===name);
+const kid = (el, name) => kids(el,name)[0];
+const desc = (el, name) => Array.from(el.getElementsByTagNameNS('*', name));
+function kmlCoords(txt){ return (txt||'').trim().split(/\s+/).filter(Boolean).map(s=>{ const a=s.split(',').map(Number); return a.length>2&&!Number.isNaN(a[2])?[a[0],a[1],a[2]]:[a[0],a[1]]; }).filter(c=>!Number.isNaN(c[0])&&!Number.isNaN(c[1])); }
+function kmlGeoms(el, acc){
+  for(const c of el.children){
+    const n = c.localName;
+    if(n==='Point'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length) acc.push({type:'Point',coordinates:k[0]}); }
+    else if(n==='LineString'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length>1) acc.push({type:'LineString',coordinates:k}); }
+    else if(n==='LinearRing'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length>3) acc.push({type:'Polygon',coordinates:[k]}); }
+    else if(n==='Polygon'){
+      const ob = kid(c,'outerBoundaryIs'), rings=[];
+      if(ob){ const lr=kid(ob,'LinearRing'); if(lr) rings.push(kmlCoords(kid(lr,'coordinates')?.textContent)); }
+      for(const ib of kids(c,'innerBoundaryIs')) for(const lr of kids(ib,'LinearRing')) rings.push(kmlCoords(kid(lr,'coordinates')?.textContent));
+      if(rings.length && rings[0].length>3) acc.push({type:'Polygon',coordinates:rings.filter(r=>r.length>3)});
+    }
+    else if(n==='MultiGeometry') kmlGeoms(c, acc);
+  }
+  return acc;
+}
+function mergeGeoms(list){ // agrupa por clase; devuelve 1..3 geometrías
+  const by = {point:[], line:[], poly:[]};
+  for(const g of list) by[CLASS[g.type]].push(g);
+  const out=[];
+  if(by.point.length) out.push(by.point.length===1?by.point[0]:{type:'MultiPoint',coordinates:by.point.map(g=>g.coordinates)});
+  if(by.line.length) out.push(by.line.length===1?by.line[0]:{type:'MultiLineString',coordinates:by.line.map(g=>g.coordinates)});
+  if(by.poly.length) out.push(by.poly.length===1?by.poly[0]:{type:'MultiPolygon',coordinates:by.poly.map(g=>g.coordinates)});
+  return out;
+}
+function readKml(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('El KML no es un XML válido.');
+  const feats=[], order=['nombre','descripcion'];
+  let skipped = 0;
+  for(const pm of desc(doc,'Placemark')){
+    const p = {nombre: kid(pm,'name')?.textContent.trim() ?? '', descripcion: (kid(pm,'description')?.textContent||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()};
+    const folders=[]; let par=pm.parentElement;
+    while(par){ if(par.localName==='Folder'){ const nm=kid(par,'name')?.textContent.trim(); if(nm) folders.unshift(nm); } par=par.parentElement; }
+    if(folders.length) p.carpeta = folders.join(' / ');
+    for(const d of desc(pm,'Data')){ const k=d.getAttribute('name'); if(k) p[k] = kid(d,'value')?.textContent ?? ''; }
+    for(const d of desc(pm,'SimpleData')){ const k=d.getAttribute('name'); if(k) p[k] = d.textContent; }
+    const gs = mergeGeoms(kmlGeoms(pm, []));
+    if(!gs.length){ skipped++; continue; }
+    for(const g of gs) feats.push({g, p:{...p}});
+  }
+  if(feats.some(f=>'carpeta' in f.p)) order.push('carpeta');
+  return {features:feats, order, skipped};
+}
+
+// ---------- GeoJSON ----------
+function readGeoJSON(text){
+  let j; try{ j = JSON.parse(text); }catch(e){ throw new Error('El archivo no es un JSON válido.'); }
+  const feats=[]; let skipped=0;
+  const push = (g, p) => {
+    if(!g){ skipped++; return; }
+    if(g.type==='GeometryCollection'){ for(const gg of mergeGeoms((g.geometries||[]).filter(x=>CLASS[x.type]))) feats.push({g:gg, p:{...p}}); return; }
+    if(CLASS[g.type]) feats.push({g:{type:g.type, coordinates:g.coordinates}, p:{...p}}); else skipped++;
+  };
+  if(j.type==='FeatureCollection') (j.features||[]).forEach(f=>push(f.geometry, f.properties||{}));
+  else if(j.type==='Feature') push(j.geometry, j.properties||{});
+  else push(j, {});
+  for(const f of feats) for(const k in f.p){ const v=f.p[k]; if(v!==null && typeof v==='object') f.p[k]=JSON.stringify(v); }
+  let crsName = j.crs?.properties?.name || null;
+  return {features:feats, skipped, crsName};
+}
+
+// ---------- GPX ----------
+function readGpx(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('El GPX no es un XML válido.');
+  const feats=[], txt=(el,n)=>kid(el,n)?.textContent.trim()??'';
+  const pt = e => { const c=[parseFloat(e.getAttribute('lon')), parseFloat(e.getAttribute('lat'))]; const z=parseFloat(txt(e,'ele')); if(!Number.isNaN(z)) c.push(z); return c; };
+  for(const w of desc(doc,'wpt')) feats.push({g:{type:'Point',coordinates:pt(w)}, p:{nombre:txt(w,'name'), descripcion:txt(w,'desc'), tipo:'waypoint', fecha:txt(w,'time')}});
+  for(const r of desc(doc,'rte')){ const c=kids(r,'rtept').map(pt); if(c.length>1) feats.push({g:{type:'LineString',coordinates:c}, p:{nombre:txt(r,'name'), descripcion:txt(r,'desc'), tipo:'ruta', fecha:''}}); }
+  for(const t of desc(doc,'trk')){
+    const segs = kids(t,'trkseg').map(s=>kids(s,'trkpt').map(pt)).filter(s=>s.length>1);
+    if(!segs.length) continue;
+    feats.push({g: segs.length===1?{type:'LineString',coordinates:segs[0]}:{type:'MultiLineString',coordinates:segs}, p:{nombre:txt(t,'name'), descripcion:txt(t,'desc'), tipo:'track', fecha:''}});
+  }
+  return {features:feats, order:['nombre','descripcion','tipo','fecha']};
+}
+
+// ---------- CSV / TXT ----------
+function parseDelim(text, d){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; continue; }
+    if(ch==='"') q=true;
+    else if(ch===d){ row.push(cur); cur=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+function parseWKT(s){
+  const m = /^\s*(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON)\s*(Z|M|ZM)?\s*(\(.*\))\s*$/i.exec(s||'');
+  if(!m) return null;
+  const type = {POINT:'Point',LINESTRING:'LineString',POLYGON:'Polygon',MULTIPOINT:'MultiPoint',MULTILINESTRING:'MultiLineString',MULTIPOLYGON:'MultiPolygon'}[m[1].toUpperCase()];
+  let body = m[3].replace(/(-?[\d.]+(?:[eE][-+]?\d+)?)((?:\s+-?[\d.]+(?:[eE][-+]?\d+)?)+)/g, t=>'['+t.trim().split(/\s+/).slice(0,m[2]&&m[2].toUpperCase()==='M'?2:3).join(',')+']')
+    .replace(/\(/g,'[').replace(/\)/g,']');
+  let c; try{ c = JSON.parse(body); }catch(e){ return null; }
+  if(type==='Point') c = c[0];
+  if(type==='MultiPoint') c = c.map(x=>Array.isArray(x[0])?x[0]:x);
+  return {type, coordinates:c};
+}
+function readCsv(text){
+  const first = text.split(/\r?\n/).find(l=>l.trim())||'';
+  const cands = [',',';','\t','|'];
+  const d = cands.map(c=>[c, first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows = parseDelim(text.replace(/^﻿/,''), d);
+  if(rows.length<2) throw new Error('El CSV necesita una fila de encabezado y al menos un registro.');
+  const head = rows[0].map(h=>h.trim());
+  const find = re => head.findIndex(h=>re.test(h.normalize('NFD').replace(/[̀-ͯ]/g,'')));
+  const iW = find(/^(wkt|geom|geometry|geometria|the_geom|shape)$/i);
+  const iX = find(/^(x|este|east|easting|e|lon|long|longitud|longitude|lng|coord_?x)$/i);
+  const iY = find(/^(y|norte|north|northing|n|lat|latitud|latitude|coord_?y)$/i);
+  const iZ = find(/^(z|cota|elev|elevacion|elevation|altura|h|alt|altitud)$/i);
+  if(iW<0 && (iX<0||iY<0)) throw new Error('No se encontraron columnas de coordenadas. Use encabezados como X/Y, Este/Norte, Lon/Lat o una columna WKT.');
+  const num = s => { s=(s||'').trim(); if(d!==',' && /^-?\d+,\d+$/.test(s)) s=s.replace(',','.'); return s===''?NaN:Number(s); };
+  const skip = new Set([iW,iX,iY,iZ].filter(i=>i>=0));
+  const order = head.filter((_,i)=>!skip.has(i));
+  const feats=[]; let bad=0;
+  for(const r of rows.slice(1)){
+    let g=null;
+    if(iW>=0) g = parseWKT(r[iW]);
+    else { const x=num(r[iX]), y=num(r[iY]); if(Number.isFinite(x)&&Number.isFinite(y)){ const c=[x,y]; if(iZ>=0){ const z=num(r[iZ]); if(Number.isFinite(z)) c.push(z); } g={type:'Point',coordinates:c}; } }
+    if(!g){ bad++; continue; }
+    const p={}; head.forEach((h,i)=>{ if(!skip.has(i)){ const v=(r[i]??'').trim(); const n=num(v); p[h] = (v!=='' && Number.isFinite(n) && /^-?[\d.,]+([eE][-+]?\d+)?$/.test(v)) ? n : v; } });
+    feats.push({g, p});
+  }
+  return {features:feats, order, skipped:bad, cols:{x:head[iX], y:head[iY], z:iZ>=0?head[iZ]:null, wkt:iW>=0?head[iW]:null}};
+}
+
+// ---------- DXF (ASCII) ----------
+function readDxf(u8){
+  const head = decodeText(u8.subarray(0,Math.min(22,u8.length)),'windows-1252');
+  if(head.startsWith('AutoCAD Binary DXF')) throw new Error('Es un DXF binario. Guárdelo como DXF ASCII y vuelva a intentarlo.');
+  let text = decodeText(u8, null);
+  const L = text.split(/\r?\n/);
+  const pairs=[]; for(let i=0;i+1<L.length;i+=2) pairs.push([parseInt(L[i],10), L[i+1]]);
+  let i = pairs.findIndex((p,k)=>p[0]===0&&p[1].trim()==='SECTION'&&pairs[k+1]&&pairs[k+1][1].trim()==='ENTITIES');
+  if(i<0) throw new Error('No se encontró la sección ENTITIES del DXF.');
+  i += 2;
+  const ents=[];
+  while(i<pairs.length){
+    if(pairs[i][0]===0){ const t=pairs[i][1].trim(); if(t==='ENDSEC') break; const e={t, c:[]}; i++;
+      while(i<pairs.length && pairs[i][0]!==0){ e.c.push(pairs[i]); i++; } ents.push(e); }
+    else i++;
+  }
+  const feats=[], unsup={}; let bulge=false;
+  const g1 = (e,code) => { const p=e.c.find(x=>x[0]===code); return p?p[1]:undefined; };
+  const gn = (e,code,def) => { const v=g1(e,code); const n=parseFloat(v); return Number.isFinite(n)?n:def; };
+  for(let k=0;k<ents.length;k++){
+    const e = ents[k], layer = (g1(e,8)||'0').trim();
+    const P = (x,y,z)=> (z!==undefined && z!==0 ? [x,y,z] : [x,y]);
+    if(e.t==='POINT') feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:'POINT', texto:''}});
+    else if(e.t==='TEXT'||e.t==='MTEXT'){
+      let s = e.c.filter(x=>x[0]===3).map(x=>x[1]).join('') + (g1(e,1)||'');
+      s = s.replace(/\\P/g,' ').replace(/\\[A-Za-z][^;]*;/g,'').replace(/[{}]/g,'').trim();
+      feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:e.t, texto:s}});
+    }
+    else if(e.t==='INSERT') feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:'INSERT', texto:(g1(e,2)||'').trim()}});
+    else if(e.t==='LINE') feats.push({g:{type:'LineString',coordinates:[P(gn(e,10,0),gn(e,20,0),gn(e,30,0)), P(gn(e,11,0),gn(e,21,0),gn(e,31,0))]}, p:{capa:layer, entidad:'LINE', texto:''}});
+    else if(e.t==='LWPOLYLINE'){
+      const closed = (gn(e,70,0)&1)===1, el = gn(e,38,0), pts=[];
+      let cur=null;
+      for(const [c,v] of e.c){ if(c===10){ cur=[parseFloat(v)]; pts.push(cur); } else if(c===20&&cur) cur.push(parseFloat(v)); else if(c===42 && parseFloat(v)!==0) bulge=true; }
+      const cs = pts.filter(p=>p.length===2).map(p=>P(p[0],p[1],el));
+      pushPath(feats, cs, closed, {capa:layer, entidad:'LWPOLYLINE', texto:''});
+    }
+    else if(e.t==='POLYLINE'){
+      const fl = gn(e,70,0), closed=(fl&1)===1, cs=[];
+      k++;
+      while(k<ents.length && ents[k].t!=='SEQEND'){ const v=ents[k]; if(v.t==='VERTEX'){ if(gn(v,42,0)!==0) bulge=true; cs.push(P(gn(v,10,0),gn(v,20,0),gn(v,30,0))); } k++; }
+      if(fl&(16|64)){ unsup['POLYLINE (malla)']=(unsup['POLYLINE (malla)']||0)+1; continue; }
+      pushPath(feats, cs, closed, {capa:layer, entidad:'POLYLINE', texto:''});
+    }
+    else if(e.t!=='SEQEND' && e.t!=='VERTEX' && e.t!=='ATTRIB') unsup[e.t]=(unsup[e.t]||0)+1;
+  }
+  return {features:feats, order:['capa','entidad','texto'], unsup, bulge};
+}
+function pushPath(feats, cs, closed, p){
+  if(cs.length<2) return;
+  if(closed && cs.length>=3){ const r=cs.slice(); const a=r[0], b=r[r.length-1]; if(a[0]!==b[0]||a[1]!==b[1]) r.push(a.slice()); feats.push({g:{type:'Polygon',coordinates:[r]}, p}); }
+  else feats.push({g:{type:'LineString',coordinates:cs}, p});
+}
+
+/* ---------- Detección del sistema ---------- */
+function crsFromWkt(w, sampleN, sampleLon){
+  const W = (w||'').toUpperCase().replace(/\s+/g,' ');
+  let fam = null;
+  if(/PROVISIONAL_S_AMERICAN|PSAD|LA_CANOA|LA CANOA/.test(W)) fam='PSAD';
+  else if(/REGVEN/.test(W)) fam='REGVEN';
+  else if(/SIRGAS/.test(W)) fam='SIRGAS';
+  else if(/WGS_1984|WGS 84|WGS84|WGS_84/.test(W)) fam='WGS84';
+  if(!fam) return null;
+  const num = re => { const m = re.exec(W); return m?parseFloat(m[1]):null; };
+  const isProj = /PROJCS|PROJCRS/.test(W);
+  let type='geo', zone=null, south=false;
+  if(isProj){
+    const cm = num(/CENTRAL_MERIDIAN"?\s*,\s*(-?[\d.]+)/), fn = num(/FALSE_NORTHING"?\s*,\s*(-?[\d.]+)/), fe = num(/FALSE_EASTING"?\s*,\s*(-?[\d.]+)/);
+    if(!/TRANSVERSE_MERCATOR/.test(W) || cm===null || Math.abs(((cm+183)/6)-Math.round((cm+183)/6))>1e-9 || (fe!==null && Math.abs(fe-500000)>1e-6)) return {unsupported:true, fam};
+    type='utm'; zone=Math.round((cm+183)/6); south=(fn||0)>=5e6;
+  }
+  const zs = zone ? zone+(south?'S':'N') : null;
+  let datum;
+  if(fam==='WGS84') datum='WGS84';
+  else if(fam==='PSAD'){
+    if(type==='geo') datum = sampleLon!==null && sampleLon < -74.4 ? 'PSADEC' : 'CANOA';
+    else if(south || zone===17) datum='PSADEC';
+    else if(zone===19||zone===20) datum='CANOA';
+    else datum = (sampleN!==null && sampleN>300000) ? 'CANOA' : 'PSADEC';
+  } else {
+    if(type==='geo') datum = sampleLon!==null && sampleLon < -74.4 ? 'SIRGAS' : (fam==='REGVEN'?'REGVEN':'REGVEN');
+    else if(south || zone<=17) datum='SIRGAS';
+    else if(zone>=19) datum='REGVEN';
+    else datum = (sampleN!==null && sampleN>300000) ? 'REGVEN' : 'SIRGAS';
+    if(type==='geo' && fam==='SIRGAS' && sampleLon!==null && sampleLon < -74.4) datum='SIRGAS';
+  }
+  const id = type==='geo' ? datum+':geo' : datum+':'+zs;
+  if(type==='utm' && !ZONES[datum].includes(zs)) return {id:'WGS84:'+zs, approx:true, fam};
+  return {id};
+}
+function detectCRS(d){
+  if(d.forcedWgs) return {id:'WGS84:geo', how:'formato', sure:true, note:`El formato ${d.fmtName} se define siempre en WGS 84 geográficas.`};
+  let xs=0, ys=0, n=0, allGeo=true, maxY=-Infinity, minY=Infinity;
+  for(const f of d.features) eachCoord(f.g, c=>{ if(n<20000){ xs+=c[0]; ys+=c[1]; n++; } if(Math.abs(c[0])>180||Math.abs(c[1])>90) allGeo=false; maxY=Math.max(maxY,c[1]); minY=Math.min(minY,c[1]); });
+  const mx = n?xs/n:0, my = n?ys/n:0;
+  if(d.prj){
+    const r = crsFromWkt(d.prj, allGeo?null:my, allGeo?mx:null);
+    if(r && r.id) return {id:r.id, how:'prj', sure:!r.approx, note: r.approx ? 'El .prj declara un sistema fuera del catálogo; se asignó el equivalente WGS 84 de la misma zona.' : 'Sistema leído del archivo .prj.'};
+    if(r && r.unsupported) return {id:null, how:'prj', sure:false, note:'El .prj declara una proyección distinta de UTM; seleccione el origen manualmente.'};
+  }
+  if(d.crsName){
+    const m = /EPSG:{1,2}(\d+)|CRS84/i.exec(d.crsName);
+    if(m){ const code = m[1]?parseInt(m[1],10):4326;
+      const hit = Object.entries(EPSG).find(([k,v])=>v===code);
+      if(code===4326) return {id:'WGS84:geo', how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'};
+      if(hit){ const [dt,z]=hit[0].split(':'); return {id: z==='geo'?dt+':geo':dt+':'+z, how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'}; }
+      if(code>=32601&&code<=32760){ const z=(code%100)+(code>32700?'S':'N'); if(ZONES.WGS84.includes(z)) return {id:'WGS84:'+z, how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'}; }
+    }
+  }
+  if(d.kind==='geojson' && allGeo) return {id:'WGS84:geo', how:'formato', sure:true, note:'GeoJSON (RFC 7946) se define en WGS 84 geográficas.'};
+  if(allGeo){
+    const id = inBox(BOX.VE,my,mx) ? 'REGVEN:geo' : (inBox(BOX.EC,my,mx)||inBox(BOX.GAL,my,mx)) ? 'SIRGAS:geo' : 'WGS84:geo';
+    return {id, how:'rango', sure:false, note:'Coordenadas geográficas sin sistema declarado: se asumió el marco SIRGAS del país. Confirme el datum.'};
+  }
+  if(minY>=9.3e6) return {id:'SIRGAS:17S', how:'rango', sure:false, note:'Sin sistema declarado. Norte mayor a 9 300 000 m sugiere UTM sur en Ecuador; se asumió SIRGAS-ECU 17S (oficial). Confirme la zona (15S/16S en Galápagos, 18S) y el datum.'};
+  if(maxY<200000) return {id:'SIRGAS:17N', how:'rango', sure:false, note:'Sin sistema declarado. Norte menor a 200 000 m sugiere UTM norte cerca del ecuador (norte de Ecuador o sur de Venezuela). Se asumió SIRGAS-ECU 17N: confirme zona y datum.'};
+  return {id:'REGVEN:19N', how:'rango', sure:false, note:'Sin sistema declarado. El rango sugiere UTM norte en Venezuela; se asumió REGVEN 19N. Confirme zona y datum en el mapa.'};
+}
+
+/* ---------- Carga de archivos ---------- */
+async function loadFiles(fileList){
+  const files = Array.from(fileList);
+  clearMsgs('loadMsgs');
+  if(!files.length) return;
+  try{
+    const entries = []; // {name, buf}
+    for(const f of files){
+      const e = extOf(f.name);
+      if(e==='zip' || e==='kmz'){
+        if(typeof JSZip==='undefined') throw new Error('No se pudo cargar la librería JSZip. Revise la conexión a internet.');
+        const z = await JSZip.loadAsync(await f.arrayBuffer());
+        for(const zf of Object.values(z.files)){ if(zf.dir || /__MACOSX|\/\._/.test(zf.name)) continue; entries.push({name:zf.name, buf:await zf.async('arraybuffer'), from:f.name}); }
+      } else entries.push({name:f.name, buf:await f.arrayBuffer()});
+    }
+    const by = ext => entries.filter(x=>extOf(x.name)===ext);
+    let d;
+    const shps = by('shp');
+    if(shps.length){
+      d = {kind:'shp', fmtName:'Shapefile', name: shps.length===1?baseOf(shps[0].name):baseOf(files[0].name), features:[], order:[], notes:[]};
+      for(const s of shps){
+        const b = baseOf(s.name).toLowerCase();
+        const mate = ext => entries.find(x=>extOf(x.name)===ext && baseOf(x.name).toLowerCase()===b);
+        const dbf = mate('dbf'), prj = mate('prj'), cpg = mate('cpg');
+        const geoms = readShp(s.buf);
+        let rows = [], fields=[];
+        if(dbf){ const r = readDbf(dbf.buf, cpg?cpgToLabel(decodeText(new Uint8Array(cpg.buf))):null); rows=r.rows; fields=r.fields.map(f=>f.name);
+          d.notes.push(`${baseOf(s.name)}: atributos leídos en ${r.enc.toUpperCase()}${cpg?' (según .cpg)':' (detectado)'}.`); }
+        else d.notes.push(`${baseOf(s.name)}: falta el .dbf; se carga solo la geometría.`);
+        if(prj && !d.prj) d.prj = decodeText(new Uint8Array(prj.buf));
+        let nulls=0, uns=0;
+        geoms.forEach((g,i)=>{ if(rows[i]===null) return; if(!g){ nulls++; return; } if(g.unsupported){ uns++; return; }
+          const p = {...(rows[i]||{})}; if(shps.length>1) p.capa_origen = baseOf(s.name); d.features.push({g,p}); });
+        if(nulls) d.notes.push(`${baseOf(s.name)}: ${nulls} registro(s) sin geometría omitido(s).`);
+        if(uns) d.notes.push(`${baseOf(s.name)}: ${uns} registro(s) de tipo no compatible (MultiPatch) omitido(s).`);
+        d.order.push(...fields.filter(x=>!d.order.includes(x)));
+      }
+      if(shps.length>1){ d.order.push('capa_origen'); d.notes.push(`Se combinaron ${shps.length} capas; el campo capa_origen indica la capa de cada elemento.`); }
+    } else {
+      const pick = entries.find(x=>['kml','geojson','json','gpx','csv','txt','dxf'].includes(extOf(x.name)));
+      if(!pick) throw new Error('No se reconoció ningún formato compatible en lo cargado.');
+      const e = extOf(pick.name), u8 = new Uint8Array(pick.buf);
+      const fromKmz = files.some(f=>extOf(f.name)==='kmz');
+      if(e==='kml'){ const r=readKml(decodeText(u8,null)); d={kind:'kml', fmtName: fromKmz?'KMZ':'KML', forcedWgs:true, ...r}; if(r.skipped) d.notes=[`${r.skipped} elemento(s) sin geometría compatible omitido(s) (modelos 3D, superposiciones, tracks gx).`]; }
+      else if(e==='geojson'||e==='json'){ const r=readGeoJSON(decodeText(u8,'utf-8')); d={kind:'geojson', fmtName:'GeoJSON', ...r}; if(r.skipped) d.notes=[`${r.skipped} elemento(s) sin geometría omitido(s).`]; }
+      else if(e==='gpx'){ d={kind:'gpx', fmtName:'GPX', forcedWgs:true, ...readGpx(decodeText(u8,'utf-8'))}; }
+      else if(e==='csv'||e==='txt'){ const r=readCsv(decodeText(u8,null)); d={kind:'csv', fmtName:'CSV', ...r};
+        d.notes=[r.cols.wkt?`Geometría leída de la columna WKT «${r.cols.wkt}».`:`Coordenadas leídas de «${r.cols.x}» y «${r.cols.y}»${r.cols.z?` y cota de «${r.cols.z}»`:''}.`];
+        if(r.skipped) d.notes.push(`${r.skipped} fila(s) sin coordenadas válidas omitida(s).`); }
+      else if(e==='dxf'){ const r=readDxf(u8); d={kind:'dxf', fmtName:'DXF', ...r, notes:[]};
+        const u = Object.entries(r.unsup).map(([k,v])=>`${k} (${v})`).join(', ');
+        if(u) d.notes.push(`Entidades no convertidas: ${u}. Solo se leen puntos, textos, bloques (como puntos), líneas y polilíneas.`);
+        if(r.bulge) d.notes.push('Hay polilíneas con arcos (bulge): se convierten como segmentos rectos entre vértices.');
+        d.notes.push('El DXF no guarda sistema de coordenadas: confirme el origen.'); }
+      d.name = baseOf(fromKmz ? files.find(f=>extOf(f.name)==='kmz').name : pick.name);
+      d.notes = d.notes || [];
+    }
+    if(!d.features.length) throw new Error('El archivo no contiene elementos con geometría compatible.');
+    d.fields = fieldsOf(d.features, d.order);
+    return d;
+  }catch(err){
+    addMsg('loadMsgs', 'err', err.message || String(err));
+  }
+}
+
+function srcToGeo(c, src){
+  if(src.type==='geo') return [c[1], c[0]];
+  return utmInv(c[0], c[1], src.zone, src.south, ELL[DATUM[src.datum].ell]);
+}
+
+
+/* =====================================================================
+   ESTADO E INTERFAZ BÁSICA
+   ===================================================================== */
+function clearMsgs(id){ $(id).innerHTML=''; }
+function addMsg(id, lvl, txt){ const d=document.createElement('div'); d.className='msg'; d.dataset.l=lvl; d.textContent=txt; $(id).appendChild(d); }
+const SHEETS = { A3:[420,297], A2:[594,420], A1:[841,594] };
+const DPI = { A3:200, A2:160, A1:130 };
+const SCALES = [500,1000,2000,2500,5000,10000,20000,25000,50000,100000,200000,250000];
+const PALETTE = ['#ED6D15','#FFD400','#00C2FF','#FF3B6B','#7CFC00','#FFFFFF','#B26BFF','#00E0A0'];
+const M = { map:null, frame:null, layers:[], orient:'L', baseLayer:null };
+const L_ = { };
+const R = 6378137, HALF = Math.PI*R;
+const merc = (lat, lon) => [lon*D2R*R, R*Math.log(Math.tan(Math.PI/4 + lat*D2R/2))];
+const unmerc = (x, y) => [(2*Math.atan(Math.exp(y/R)) - Math.PI/2)/D2R, x/R/D2R];
+const T = s => String(s??'').replace(/[−–—]/g,'-').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,'...').replace(/[^\x00-\xFF€]/g,'?');
+const fmtN = (v,d=0) => Number(v).toLocaleString('es',{minimumFractionDigits:d, maximumFractionDigits:d});
+
+/* ---------- Disposición de la hoja (mm) ---------- */
+function pageLayout(){
+  const sh = $('pSheet').value; let [W,H] = SHEETS[sh]; if(M.orient==='P') [W,H] = [H,W];
+  const k = Math.sqrt(W*H/(420*297));                 // escala tipográfica relativa a A3
+  const m = 10*k, gl = 7*k, gap = 4*k, th = 16*k, foot = 6*k;
+  if(M.orient==='L'){                                  // horizontal: panel a la derecha
+    const sw = 0.22*W, fx = m + gl, fy = m + th + gap + gl;
+    return {mode:'side', sheet:sh, W, H, k, m, gl, gap, th, foot, sw, fx, fy, fw: W - 2*m - sw - gap - 2*gl, fh: H - fy - gl - foot - m,
+      panel:{x: W - m - sw, y: m + th + gap, w: sw, h: H - (m + th + gap) - foot - m - 2*k}, dpi: DPI[sh]};
+  }
+  const ph = 0.16*H, fx = m + gl, fy = m + th + gap + gl;  // vertical: franja inferior
+  return {mode:'bottom', sheet:sh, W, H, k, m, gl, gap, th, foot, fx, fy, fw: W - 2*m - 2*gl, fh: H - fy - gl - gap - ph - foot - m,
+    panel:{x: m, y: H - m - foot - ph, w: W - 2*m, h: ph}, dpi: DPI[sh]};
+}
+/* Extensión del marco en Mercator a partir del centro y la escala (escala verdadera en el centro) */
+function frameExtent(center, scale){
+  const P = pageLayout(), c = Math.cos(center.lat*D2R);
+  const wM = P.fw/1000*scale/c, hM = P.fh/1000*scale/c, [cx, cy] = merc(center.lat, center.lng);
+  return {P, x0:cx-wM/2, x1:cx+wM/2, y0:cy-hM/2, y1:cy+hM/2, wM, hM, cx, cy};
+}
+function curScale(){ return +$('pScale').value; }
+
+/* =====================================================================
+   CAPAS
+   ===================================================================== */
+function layerToWgs(Lr){
+  const src = crsParse(Lr.crs); let bad=0;
+  Lr.piv = Lr.data.features.map(f=>({g:mapGeom(f.g, c=>{
+    const [la0,lo0] = srcToGeo(c, src);
+    if(!Number.isFinite(la0)||!Number.isFinite(lo0)||Math.abs(la0)>85){ bad++; return [0,0]; }
+    const [la,lo] = toPivot(src.datum, la0, lo0); return [lo, la];
+  }), p:f.p}));
+  Lr.bad = bad;
+}
+function layerBounds(Lr){ let b=[Infinity,Infinity,-Infinity,-Infinity]; Lr.piv.forEach(f=>eachCoord(f.g,c=>{ b[0]=Math.min(b[0],c[0]); b[1]=Math.min(b[1],c[1]); b[2]=Math.max(b[2],c[0]); b[3]=Math.max(b[3],c[1]); })); return b; }
+async function addFiles(files){
+  const d = await loadFiles(files); if(!d) return;
+  const det = detectCRS(d);
+  const cls = new Set(d.features.map(f=>CLASS[f.g.type]));
+  const Lr = { id:Date.now()+Math.random(), name:d.name, data:d, crs:det.id||'WGS84:geo', det, visible:true,
+    color:PALETTE[M.layers.length%PALETTE.length], width:0.5, fill:0.15, ptSize:2.2, label:'', cls };
+  layerToWgs(Lr); M.layers.push(Lr);
+  (d.notes||[]).forEach(n=>addMsg('loadMsgs','info',`${d.name}: ${n}`));
+  if(!det.sure) addMsg('loadMsgs','warn',`${d.name}: ${det.note} Verifique en el mapa que la capa cae donde corresponde.`);
+  if(Lr.bad) addMsg('loadMsgs','warn',`${d.name}: ${Lr.bad} vértice(s) no se pudieron ubicar con el sistema asignado.`);
+  renderLayers(); drawPreview(); if(M.layers.length===1) fitAll();
+}
+function renderLayers(){
+  const box = $('layers');
+  box.innerHTML = M.layers.map((Lr,i)=>{
+    const flds = ['<option value="">— sin rótulos —</option>', ...Lr.data.fields.map(f=>`<option value="${esc(f)}" ${f===Lr.label?'selected':''}>${esc(f)}</option>`)].join('');
+    const hasPoly = Lr.cls.has('poly'), hasPt = Lr.cls.has('point');
+    return `<div class="layer" data-i="${i}">
+      <div class="hd"><input type="checkbox" data-k="visible" ${Lr.visible?'checked':''} aria-label="Mostrar capa" style="accent-color:var(--accent);width:16px;height:16px">
+        <input type="text" data-k="name" value="${esc(Lr.name)}" aria-label="Nombre en la leyenda">
+        <input type="color" data-k="color" value="${Lr.color}" aria-label="Color">
+        <button class="btn sm" type="button" data-a="up" title="Subir" ${i===0?'disabled':''}>↑</button>
+        <button class="btn sm" type="button" data-a="del" title="Quitar capa">✕</button></div>
+      <div class="meta">${Lr.data.fmtName} · ${Lr.data.features.length} elementos${Lr.det.sure?'':' · sistema estimado'}</div>
+      <div class="f"><label>Sistema de coordenadas de la capa</label><select data-k="crs">${crsOpts(Lr.crs)}</select></div>
+      <div class="grid">
+        <div class="f"><label>Grosor línea (mm)</label><input type="number" data-k="width" min="0.1" max="3" step="0.1" value="${Lr.width}"></div>
+        <div class="f" ${hasPoly?'':'hidden'}><label>Relleno (0–1)</label><input type="number" data-k="fill" min="0" max="1" step="0.05" value="${Lr.fill}"></div>
+        <div class="f" ${hasPt?'':'hidden'}><label>Tamaño punto (mm)</label><input type="number" data-k="ptSize" min="0.5" max="8" step="0.1" value="${Lr.ptSize}"></div>
+      </div>
+      <div class="f"><label>Rótulos</label><select data-k="label">${flds}</select></div>
+    </div>`; }).join('') || '<p class="note">Sin capas. Puede generar el mapa solo con el fondo.</p>';
+}
+function crsOpts(sel){
+  let h=''; for(const [d,g] of GROUPS){ h+=`<optgroup label="${g}">`; [d+':geo', ...ZONES[d].map(z=>d+':'+z)].forEach(id=>{ const c=crsParse(id); h+=`<option value="${id}" ${id===sel?'selected':''}>${crsLabel(c)}</option>`; }); h+='</optgroup>'; }
+  return h;
+}
+
+/* =====================================================================
+   VISTA PREVIA
+   ===================================================================== */
+const TILES = {
+  esri:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  trans:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+  places:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  osm:'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+};
+const ATTR = { esri:'Imagen: Esri, Maxar, Earthstar Geographics y comunidad de usuarios SIG', esriref:'Imagen: Esri, Maxar, Earthstar Geographics y comunidad de usuarios SIG · Referencias: Esri', osm:'© OpenStreetMap contributors' };
+let prevLayers = [];
+function initMap(){
+  if(typeof L==='undefined'){ $('map').innerHTML='<p class="note" style="padding:14px">No se pudo cargar Leaflet. Revise la conexión a internet.</p>'; return; }
+  M.map = L.map('map', {zoomControl:true, preferCanvas:true}).setView([-0.18,-78.47], 14);
+  L.control.scale({imperial:false}).addTo(M.map);
+  setBase(); M.map.on('move zoom', updateFrame);
+}
+function setBase(){
+  if(!M.map) return; (M.baseLayer||[]).forEach(l=>M.map.removeLayer(l));
+  const b = $('pBase').value;
+  M.baseLayer = b==='osm' ? [L.tileLayer(TILES.osm,{maxZoom:19, attribution:ATTR.osm})]
+    : [L.tileLayer(TILES.esri,{maxZoom:20, attribution:'Esri World Imagery'}), ...(b==='esriref'?[L.tileLayer(TILES.trans,{maxZoom:20}), L.tileLayer(TILES.places,{maxZoom:20})]:[])];
+  M.baseLayer.forEach(l=>{ l.addTo(M.map); l.bringToBack(); });
+}
+function drawPreview(){
+  if(!M.map) return; prevLayers.forEach(l=>M.map.removeLayer(l)); prevLayers=[];
+  [...M.layers].reverse().forEach(Lr=>{ if(!Lr.visible) return;
+    const fc={type:'FeatureCollection', features:Lr.piv.map(f=>({type:'Feature', geometry:f.g, properties:f.p}))};
+    const g = L.geoJSON(fc,{style:{color:Lr.color, weight:Math.max(1,Lr.width*3), fillColor:Lr.color, fillOpacity:Lr.fill},
+      pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:Math.max(2,Lr.ptSize*1.6), color:'#FFFFFF', weight:1, fillColor:Lr.color, fillOpacity:1})}).addTo(M.map);
+    prevLayers.push(g); });
+  updateFrame();
+}
+function updateFrame(){
+  if(!M.map) return;
+  const E = frameExtent(M.map.getCenter(), curScale());
+  const [la0,lo0] = unmerc(E.x0,E.y0), [la1,lo1] = unmerc(E.x1,E.y1);
+  const bb = [[la0,lo0],[la1,lo1]];
+  if(!M.frame) M.frame = L.rectangle(bb,{color:'#ED6D15', weight:2.5, fill:false, dashArray:'8 5', interactive:false}).addTo(M.map); else M.frame.setBounds(bb);
+  const P = E.P, gw = P.fw/1000*curScale(), gh = P.fh/1000*curScale();
+  $('mapInfo').innerHTML = `<span>Hoja <b>${P.sheet} ${M.orient==='L'?'horizontal':'vertical'}</b></span><span>Escala <b>1:${fmtN(curScale())}</b></span><span>Área <b>${fmtN(gw)} × ${fmtN(gh)} m</b></span><span>Centro <b>${M.map.getCenter().lat.toFixed(5)}, ${M.map.getCenter().lng.toFixed(5)}</b></span>`;
+  const px = Math.round(P.fw/25.4*P.dpi)*Math.round(P.fh/25.4*P.dpi), z = tileZoom(E);
+  const nt = Math.ceil(E.wM/res(z)/256+1)*Math.ceil(E.hM/res(z)/256+1);
+  $('outInfo').textContent = `Imagen del marco a ${P.dpi} ppp (${fmtN(px/1e6,1)} Mpx) · nivel de teselas ${z} · ~${fmtN(nt)} teselas${$('pBase').value==='esriref'?' por capa (3 capas)':''}.`;
+  refreshGridOptions(E);
+}
+const res = z => 2*HALF/(256*2**z);
+function tileZoom(E){ const P=E.P, pix = E.wM/(P.fw/25.4*P.dpi); return Math.max(0, Math.min(19, Math.round(Math.log2(2*HALF/(256*pix))))); }
+function fitAll(){
+  const vis = M.layers.filter(l=>l.visible && l.piv.length); if(!vis.length || !M.map){ $('fitNote').textContent='Agregue al menos una capa visible.'; return; }
+  let b=[Infinity,Infinity,-Infinity,-Infinity]; vis.forEach(l=>{ const q=layerBounds(l); b=[Math.min(b[0],q[0]),Math.min(b[1],q[1]),Math.max(b[2],q[2]),Math.max(b[3],q[3])]; });
+  const cLat=(b[1]+b[3])/2, cLon=(b[0]+b[2])/2, c=Math.cos(cLat*D2R), P=pageLayout();
+  const [x0,y0]=merc(b[1],b[0]), [x1,y1]=merc(b[3],b[2]);
+  const need = Math.max((x1-x0)*c/(P.fw/1000), (y1-y0)*c/(P.fh/1000))*1.08;
+  const sc = SCALES.find(s=>s>=need) || SCALES[SCALES.length-1];
+  $('pScale').value = sc;
+  const [cx,cy] = [(x0+x1)/2,(y0+y1)/2], [la,lo] = unmerc(cx,cy);
+  const zf = M.map.getBoundsZoom(L.latLngBounds([b[1],b[0]],[b[3],b[2]]).pad(0.35)); M.map.setView([la,lo], zf, {animate:false});
+  $('fitNote').textContent = `Escala elegida: 1:${fmtN(sc)}.`; updateFrame();
+}
+
+/* =====================================================================
+   CUADRÍCULA
+   ===================================================================== */
+const niceStep = (raw, opts) => { const p = 10**Math.floor(Math.log10(raw)); return (opts||[1,2,2.5,5,10]).map(k=>k*p).find(v=>v>=raw) || 10*p; };
+function gridSpec(E){
+  const type = $('pGrid').value; if(type==='none') return null;
+  const [laC,loC] = unmerc(E.cx,E.cy);
+  if(type==='utm'){
+    const zone = Math.floor((loC+180)/6)+1, south = laC<0;
+    const pts=[]; for(let i=0;i<=8;i++) for(const [fx,fy] of [[i/8,0],[i/8,1],[0,i/8],[1,i/8]]){ const [la,lo]=unmerc(E.x0+fx*E.wM, E.y0+fy*E.hM); pts.push(utmFwd(la,lo,zone,south,ELL.WGS84)); }
+    const e0=Math.min(...pts.map(p=>p[0])), e1=Math.max(...pts.map(p=>p[0])), n0=Math.min(...pts.map(p=>p[1])), n1=Math.max(...pts.map(p=>p[1]));
+    const sel = $('pGridInt').value, step = sel==='auto' ? niceStep(Math.max(e1-e0,n1-n0)/7) : +sel;
+    return {type, zone, south, step, e0, e1, n0, n1};
+  }
+  const [la0,lo0]=unmerc(E.x0,E.y0), [la1,lo1]=unmerc(E.x1,E.y1);
+  const sel = $('pGridInt').value; const opts=[1/3600,2/3600,5/3600,10/3600,15/3600,30/3600,1/60,2/60,5/60,10/60,15/60,30/60,1,2,5];
+  const step = sel==='auto' ? (opts.find(v=>v>=Math.max(lo1-lo0,la1-la0)/7)||5) : +sel;
+  return {type, step, la0, la1, lo0, lo1};
+}
+function refreshGridOptions(E){
+  const g = gridSpec(E), sel = $('pGridInt'), prev = sel.value; $('rGridInt').hidden = !g; if(!g) return;
+  let opts;
+  if(g.type==='utm'){ const base = niceStep((Math.max(g.e1-g.e0,g.n1-g.n0))/7); opts=[base/5,base/2,base,base*2,base*5].map(v=>[String(v), `${fmtN(v)} m`]); }
+  else { const all=[[1/3600,'1″'],[2/3600,'2″'],[5/3600,'5″'],[10/3600,'10″'],[15/3600,'15″'],[30/3600,'30″'],[1/60,"1′"],[2/60,"2′"],[5/60,"5′"],[10/60,"10′"],[15/60,"15′"],[30/60,"30′"],[1,'1°']];
+    const auto = g.step; const i = all.findIndex(a=>Math.abs(a[0]-auto)<1e-12); opts = all.slice(Math.max(0,i-2), i+3).map(a=>[String(a[0]),a[1]]); }
+  const html = `<option value="auto">Automático (${g.type==='utm'?fmtN(gridSpec({...E}).step)+' m':angLbl(g.step)})</option>` + opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
+  if(sel.dataset.h!==html){ sel.innerHTML = html; sel.dataset.h = html; sel.value = [...sel.options].some(o=>o.value===prev) ? prev : 'auto'; }
+}
+function angLbl(v){ return v>=1 ? `${v}°` : v>=1/60-1e-12 ? `${Math.round(v*60)}′` : `${Math.round(v*3600)}″`; }
+function dms(v, isLat, step){ const h = isLat?(v<0?'S':'N'):(v<0?'W':'E'); let a=Math.abs(v), d=Math.floor(a+1e-9), m=Math.floor((a-d)*60+1e-9), s=Math.round(((a-d)*60-m)*60);
+  if(s===60){ s=0; m++; } if(m===60){ m=0; d++; }
+  return step>=1/60-1e-12 ? `${d}°${String(m).padStart(2,'0')}′${h}` : `${d}°${String(m).padStart(2,'0')}′${String(s).padStart(2,'0')}″${h}`; }
+
+/* =====================================================================
+   RENDER DEL MARCO (canvas a la resolución de impresión)
+   ===================================================================== */
+function loadImg(url){ return new Promise((res_,rej)=>{ const im=new Image(); im.crossOrigin='anonymous'; const to=setTimeout(()=>rej(new Error('timeout')),15000);
+  im.onload=()=>{ clearTimeout(to); res_(im); }; im.onerror=()=>{ clearTimeout(to); rej(new Error('tile')); }; im.src=url; }); }
+function isPlaceholder(im){ try{ const c=document.createElement('canvas'); c.width=c.height=32; const g=c.getContext('2d'); g.drawImage(im,0,0,32,32);
+  const d=g.getImageData(0,0,32,32).data; let n=0; for(let i=0;i<d.length;i+=4){ const r=d[i],gg=d[i+1],b=d[i+2]; if(Math.abs(r-gg)<8&&Math.abs(gg-b)<8&&r>185&&r<225) n++; } return n/(d.length/4)>0.8; }catch(e){ return false; } }
+async function drawTileLayer(g, tpl, z, E, pix, Wp, Hp, opt, check, onTile){
+  const r = res(z), gx0 = (E.x0+HALF)/r, gy0 = (HALF-E.y1)/r, f = r/pix;
+  const tx0 = Math.floor(gx0/256), ty0 = Math.floor(gy0/256), tx1 = Math.floor((gx0+Wp/f)/256), ty1 = Math.floor((gy0+Hp/f)/256), n = 2**z;
+  const jobs = [];
+  for(let tx=tx0; tx<=tx1; tx++) for(let ty=ty0; ty<=ty1; ty++){
+    if(ty<0||ty>=n) continue; const wx = ((tx%n)+n)%n;
+    jobs.push(loadImg(tpl.replace('{z}',z).replace('{x}',wx).replace('{y}',ty)).then(im=>{ onTile(); return {im,tx,ty}; }).catch(e=>{ onTile(); if(opt) return null; throw e; }));
+  }
+  const tiles = await Promise.all(jobs);
+  if(check){ const ph = tiles.filter(t=>t&&isPlaceholder(t.im)).length; if(ph/tiles.length>0.4) throw new Error('placeholder'); }
+  g.imageSmoothingQuality = 'high';
+  for(const t of tiles) if(t) g.drawImage(t.im, (t.tx*256-gx0)*f, (t.ty*256-gy0)*f, 256*f+0.6, 256*f+0.6);
+  return jobs.length;
+}
+async function renderFrame(E, onProg){
+  const P = E.P, Wp = Math.round(P.fw/25.4*P.dpi), Hp = Math.round(P.fh/25.4*P.dpi), pix = E.wM/Wp;
+  const c = document.createElement('canvas'); c.width=Wp; c.height=Hp; const g = c.getContext('2d');
+  g.fillStyle='#E8ECEF'; g.fillRect(0,0,Wp,Hp);
+  const base = $('pBase').value; let z = tileZoom(E), used = base;
+  const tick = () => onProg && onProg();
+  if(base!=='osm'){
+    let ok=false;
+    for(let zz=z; zz>=Math.max(0,z-3) && !ok; zz--){
+      try{ g.fillRect(0,0,Wp,Hp); await drawTileLayer(g, TILES.esri, zz, E, pix, Wp, Hp, false, true, tick);
+        if(base==='esriref'){ await drawTileLayer(g, TILES.trans, zz, E, pix, Wp, Hp, true, false, tick); await drawTileLayer(g, TILES.places, zz, E, pix, Wp, Hp, true, false, tick); }
+        g.getImageData(0,0,1,1); ok=true; z=zz; }
+      catch(e){ if(e.message!=='placeholder') break; }
+    }
+    if(!ok){ used='osm'; g.fillRect(0,0,Wp,Hp); await drawTileLayer(g, TILES.osm, Math.min(z,19), E, pix, Wp, Hp, false, false, tick); }
+  } else await drawTileLayer(g, TILES.osm, Math.min(z,19), E, pix, Wp, Hp, false, false, tick);
+  // Capas vectoriales
+  const mm = P.dpi/25.4, toPx = (lon,lat) => { const [x,y]=merc(lat,lon); return [(x-E.x0)/pix, (E.y1-y)/pix]; };
+  const labels = [];
+  for(const Lr of [...M.layers].reverse()){
+    if(!Lr.visible) continue;
+    g.lineJoin='round'; g.lineCap='round';
+    for(const f of Lr.piv){
+      const gm = f.g, cls = CLASS[gm.type];
+      const path = ring => { ring.forEach((c,i)=>{ const [px,py]=toPx(c[0],c[1]); i?g.lineTo(px,py):g.moveTo(px,py); }); };
+      if(cls==='poly'){
+        const polys = gm.type==='Polygon'?[gm.coordinates]:gm.coordinates;
+        g.beginPath(); polys.forEach(p=>p.forEach(r=>{ path(r); g.closePath(); }));
+        if(Lr.fill>0){ g.globalAlpha=Lr.fill; g.fillStyle=Lr.color; g.fill('evenodd'); g.globalAlpha=1; }
+        g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=Lr.width*mm+1.6*mm*0.25; g.stroke(); g.strokeStyle=Lr.color; g.lineWidth=Lr.width*mm; g.stroke();
+      } else if(cls==='line'){
+        const lines = gm.type==='LineString'?[gm.coordinates]:gm.coordinates;
+        g.beginPath(); lines.forEach(path);
+        g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=Lr.width*mm+0.4*mm; g.stroke(); g.strokeStyle=Lr.color; g.lineWidth=Lr.width*mm; g.stroke();
+      } else {
+        const pts = gm.type==='Point'?[gm.coordinates]:gm.coordinates;
+        for(const c of pts){ const [px,py]=toPx(c[0],c[1]); g.beginPath(); g.arc(px,py,Lr.ptSize*mm/2,0,2*Math.PI); g.fillStyle=Lr.color; g.fill(); g.lineWidth=0.25*mm; g.strokeStyle='#FFFFFF'; g.stroke(); }
+      }
+      if(Lr.label && f.p[Lr.label]!==undefined && f.p[Lr.label]!==null && f.p[Lr.label]!==''){
+        let a=null; if(cls==='point'){ const c=gm.type==='Point'?gm.coordinates:gm.coordinates[0]; a=toPx(c[0],c[1]); a=[a[0]+Lr.ptSize*mm*0.7, a[1]-Lr.ptSize*mm*0.7]; }
+        else { let sx=0,sy=0,n=0; eachCoord(gm,c=>{ const q=toPx(c[0],c[1]); sx+=q[0]; sy+=q[1]; n++; }); a=[sx/n, sy/n]; }
+        labels.push([a, String(f.p[Lr.label]), cls==='point'?'left':'center']);
+      }
+    }
+  }
+  // Cuadrícula
+  const G = gridSpec(E), ticks = {top:[], bottom:[], left:[], right:[]};
+  if(G){
+    g.save();
+    const strokeLine = pts => { g.beginPath(); pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));
+      g.strokeStyle='rgba(0,0,0,0.35)'; g.lineWidth=0.45*mm; g.stroke(); g.strokeStyle='rgba(255,255,255,0.85)'; g.lineWidth=0.2*mm; g.stroke(); };
+    const cross = (pts, axis, val, side) => { for(let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], v0=axis==='y'?a[1]:a[0], v1=axis==='y'?b[1]:b[0];
+        if((v0-val)*(v1-val)<=0 && v0!==v1){ const t=(val-v0)/(v1-v0); return axis==='y' ? a[0]+t*(b[0]-a[0]) : a[1]+t*(b[1]-a[1]); } } return null; };
+    if(G.type==='utm'){
+      const s=G.step, ns=40;
+      for(let e=Math.ceil(G.e0/s)*s; e<=G.e1; e+=s){ const pts=[]; for(let i=0;i<=ns;i++){ const n=G.n0+(G.n1-G.n0)*i/ns, [la,lo]=utmInv(e,n,G.zone,G.south,ELL.WGS84); pts.push(toPx(lo,la)); } strokeLine(pts);
+        const b=cross(pts,'y',Hp,'b'), t=cross(pts,'y',0,'t'); if(b!==null&&b>=0&&b<=Wp) ticks.bottom.push([b, fmtN(e)]); if(t!==null&&t>=0&&t<=Wp) ticks.top.push([t, fmtN(e)]); }
+      for(let n=Math.ceil(G.n0/s)*s; n<=G.n1; n+=s){ const pts=[]; for(let i=0;i<=ns;i++){ const e=G.e0+(G.e1-G.e0)*i/ns, [la,lo]=utmInv(e,n,G.zone,G.south,ELL.WGS84); pts.push(toPx(lo,la)); } strokeLine(pts);
+        const l=cross(pts,'x',0), r=cross(pts,'x',Wp); if(l!==null&&l>=0&&l<=Hp) ticks.left.push([l, fmtN(n)]); if(r!==null&&r>=0&&r<=Hp) ticks.right.push([r, fmtN(n)]); }
+    } else {
+      const s=G.step;
+      for(let lo=Math.ceil(G.lo0/s-1e-9)*s; lo<=G.lo1+1e-12; lo+=s){ const x=toPx(lo,0)[0]; strokeLine([[x,0],[x,Hp]]); ticks.bottom.push([x, dms(lo,false,s)]); ticks.top.push([x, dms(lo,false,s)]); }
+      for(let la=Math.ceil(G.la0/s-1e-9)*s; la<=G.la1+1e-12; la+=s){ const y=toPx(0,la)[1]; strokeLine([[0,y],[Wp,y]]); ticks.left.push([y, dms(la,true,s)]); ticks.right.push([y, dms(la,true,s)]); }
+    }
+    g.restore();
+  }
+  // Rótulos (encima de todo)
+  g.font = `600 ${2.4*mm*P.k}px Arial`; g.textBaseline='middle';
+  for(const [a,t,al] of labels){ g.textAlign=al; g.lineWidth=0.7*mm; g.strokeStyle='rgba(255,255,255,0.95)'; g.strokeText(t,a[0],a[1]); g.fillStyle='#111'; g.fillText(t,a[0],a[1]); }
+  return {canvas:c, Wp, Hp, used, z, ticks, G};
+}
+
+/* =====================================================================
+   PDF + GEORREFERENCIACIÓN (ISO 32000, diccionario VP / Measure GEO)
+   ===================================================================== */
+const WKT3857 = 'PROJCS["WGS 84 / Pseudo-Mercator",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Mercator_1SP"],PARAMETER["central_meridian",0],PARAMETER["scale_factor",1],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1],EXTENSION["PROJ4","+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs"],AUTHORITY["EPSG","3857"]]';
+async function makePdf(){
+  if(!window.jspdf || !window.PDFLib) throw new Error('No se pudieron cargar las librerías de PDF. Revise la conexión a internet.');
+  const sc = curScale(), E = frameExtent(M.map.getCenter(), sc), P = E.P, k = P.k;
+  const prog = $('prog'), bar = prog.firstElementChild; prog.hidden=false; bar.style.width='0%';
+  const z0 = tileZoom(E), nPer = Math.ceil(E.wM/res(z0)/256+1)*Math.ceil(E.hM/res(z0)/256+1), total = nPer*($('pBase').value==='esriref'?3:1); let done=0;
+  const F = await renderFrame(E, ()=>{ done++; bar.style.width = Math.min(95, done/total*95)+'%'; });
+  const doc = new window.jspdf.jsPDF({unit:'mm', format:[P.W,P.H], orientation: P.W>P.H?'landscape':'portrait', compress:true});
+  const ink = [15,42,64], brand = [20,84,135], acc = [237,109,21];
+  doc.setLineWidth(0.4*k); doc.setDrawColor(...ink);
+  doc.rect(P.m, P.m, P.W-2*P.m, P.H-2*P.m);
+  // Título
+  doc.setFillColor(...brand); doc.rect(P.m, P.m, P.W-2*P.m, P.th, 'F');
+  doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(20*k);
+  const title = T($('pTitle').value.trim() || 'Mapa base'); const tl = doc.splitTextToSize(title, P.W-2*P.m-12*k).slice(0,2);
+  doc.text(tl, P.W/2, P.m + P.th/2 + (tl.length===1? 2.6*k : -0.4*k), {align:'center'});
+  // Marco
+  doc.addImage(F.canvas.toDataURL('image/jpeg',0.9), 'JPEG', P.fx, P.fy, P.fw, P.fh, undefined, 'FAST');
+  doc.setLineWidth(0.5*k); doc.setDrawColor(...ink); doc.rect(P.fx, P.fy, P.fw, P.fh);
+  // Rótulos de cuadrícula (fuera del marco)
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5*k); doc.setTextColor(...ink); doc.setLineWidth(0.25*k);
+  const sxp = P.fw/F.Wp, syp = P.fh/F.Hp, tk = 1.6*k;
+  F.ticks.bottom.forEach(([x,t])=>{ const X=P.fx+x*sxp; doc.line(X,P.fy+P.fh,X,P.fy+P.fh+tk); doc.text(T(t),X,P.fy+P.fh+tk+2.4*k,{align:'center'}); });
+  F.ticks.top.forEach(([x,t])=>{ const X=P.fx+x*sxp; doc.line(X,P.fy,X,P.fy-tk); doc.text(T(t),X,P.fy-tk-0.8*k,{align:'center'}); });
+  F.ticks.left.forEach(([y,t])=>{ const Y=P.fy+y*syp; doc.line(P.fx,Y,P.fx-tk,Y); doc.text(T(t),P.fx-tk-0.8*k,Y,{align:'center', angle:90}); });
+  F.ticks.right.forEach(([y,t])=>{ const Y=P.fy+y*syp; doc.line(P.fx+P.fw,Y,P.fx+P.fw+tk,Y); doc.text(T(t),P.fx+P.fw+tk+2.4*k,Y,{align:'center', angle:90}); });
+  // Bloques: norte, escala, leyenda y datos
+  const pad = 4*k, PN = P.panel;
+  const box = (r, title) => { doc.setDrawColor(...ink); doc.setLineWidth(0.3*k); doc.rect(r.x, r.y, r.w, r.h);
+    if(title){ doc.setFillColor(...brand); doc.rect(r.x, r.y, r.w, 6*k, 'F'); doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(8.5*k); doc.text(T(title), r.x+pad, r.y+4.1*k); } };
+  const vis = M.layers.filter(l=>l.visible), rowH = 6*k;
+  const [laC,loC] = unmerc(E.cx,E.cy), G = F.G;
+  const dataLines = [
+    ['Proyección del mapa', 'WGS 84 / Pseudo-Mercator (EPSG 3857)'],
+    ['Cuadrícula', !G ? 'Sin cuadrícula' : G.type==='utm' ? `UTM zona ${G.zone}${G.south?'S':'N'} (WGS 84) · cada ${fmtN(G.step)} m` : `Geográfica WGS 84 · cada ${angLbl(G.step)}`],
+    ['Centro', `${laC.toFixed(5)}, ${loC.toFixed(5)}`],
+    ['Imagen de fondo', ATTR[F.used==='osm'?'osm':$('pBase').value]],
+    ['Fecha', new Date().toLocaleDateString('es')],
+    ...($('pAuthor').value.trim()?[['Elaborado por', $('pAuthor').value.trim()]]:[])
+  ];
+  let R_;
+  if(P.mode==='side'){
+    const nh = 34*k, shh = 30*k, lh = 6*k + Math.max(1,vis.length)*rowH + 3*k;
+    doc.setFont('helvetica','normal'); doc.setFontSize(7*k);
+    const dh = 6*k + dataLines.reduce((s_,[a_,b_])=>s_+3.2*k+doc.splitTextToSize(T(b_), PN.w-2*pad).length*3*k+1*k,0) + 2*k;
+    const yN = PN.y, yS = yN+nh, yL = yS+shh, yD = Math.max(yL+lh, PN.y+PN.h-dh);
+    R_ = { n:{x:PN.x,y:yN,w:PN.w,h:nh}, s:{x:PN.x,y:yS,w:PN.w,h:shh}, l:{x:PN.x,y:yL,w:PN.w,h:lh}, d:{x:PN.x,y:yD,w:PN.w,h:PN.y+PN.h-yD} };
+  } else {
+    const g2 = 3*k, ws = [0.12,0.22,0.30,0.36].map(f=>f*(PN.w-3*g2)); let x = PN.x;
+    const rr = ws.map(w=>{ const r={x, y:PN.y, w, h:PN.h}; x += w+g2; return r; });
+    R_ = { n:rr[0], s:rr[1], l:rr[2], d:rr[3] };
+  }
+  // Norte
+  box(R_.n); { const r = R_.n, cx = r.x+r.w/2, rr = Math.min(11*k, r.h*0.32, r.w*0.3), cy = r.y+r.h/2+rr*0.25;
+    doc.setFillColor(...ink); doc.triangle(cx, cy-rr, cx-rr*0.45, cy+rr*0.7, cx, cy+rr*0.35, 'F');
+    doc.setFillColor(255,255,255); doc.setDrawColor(...ink); doc.setLineWidth(0.3*k); doc.triangle(cx, cy-rr, cx+rr*0.45, cy+rr*0.7, cx, cy+rr*0.35, 'FD');
+    doc.setTextColor(...ink); doc.setFont('helvetica','bold'); doc.setFontSize(12*k); doc.text('N', cx, cy-rr-2*k, {align:'center'}); }
+  // Escala
+  box(R_.s,'ESCALA'); { const r = R_.s, cyy = r.y+6*k + (r.h-6*k)/2;
+    doc.setTextColor(...ink); doc.setFont('helvetica','bold'); doc.setFontSize(12*k); doc.text(T(`1:${fmtN(sc)}`), r.x+r.w/2, cyy-4*k, {align:'center'});
+    const maxMm = r.w-2*pad-8*k; let Lm = niceStep(maxMm/1000*sc/1.05,[1,2,2.5,5]); while(Lm/sc*1000 > maxMm) Lm = niceStep(Lm/2.01,[1,2,2.5,5]);
+    const Lmm = Lm/sc*1000, x0 = r.x+(r.w-Lmm)/2, yb = cyy+1*k, segs = 4;
+    for(let i=0;i<segs;i++){ doc.setFillColor(...(i%2?[255,255,255]:ink)); doc.setDrawColor(...ink); doc.setLineWidth(0.25*k); doc.rect(x0+i*Lmm/segs, yb, Lmm/segs, 1.8*k, 'FD'); }
+    doc.setFont('helvetica','normal'); doc.setFontSize(7*k);
+    const u = v => v>=1000 ? `${fmtN(v/1000, v%1000?1:0)} km` : `${fmtN(v, v%1?1:0)} m`;
+    doc.text('0', x0, yb+5*k, {align:'center'}); doc.text(T(u(Lm/2)), x0+Lmm/2, yb+5*k, {align:'center'}); doc.text(T(u(Lm)), x0+Lmm, yb+5*k, {align:'center'});
+    doc.setFontSize(6*k); doc.setTextColor(90); doc.text(T('Escala verdadera en el centro del mapa'), r.x+r.w/2, Math.min(r.y+r.h-2*k, yb+10*k), {align:'center'}); }
+  // Leyenda
+  box(R_.l,'LEYENDA'); { const r = R_.l; let yy = r.y + 6*k + 4.2*k; doc.setFont('helvetica','normal'); doc.setFontSize(7.5*k); doc.setTextColor(...ink);
+    if(!vis.length) doc.text('Sin capas vectoriales', r.x+pad, yy);
+    for(const Lr of vis){ if(yy > r.y+r.h-1.5*k){ doc.text('…', r.x+pad, yy-rowH+2.5*k); break; }
+      const [cr,cg,cb] = hexRgb(Lr.color), sx0 = r.x+pad, w = 9*k;
+      if(Lr.cls.has('poly')){ doc.setFillColor(...blendWhite([cr,cg,cb], Lr.fill)); doc.setDrawColor(cr,cg,cb); doc.setLineWidth(Math.max(0.2,Lr.width)*k); doc.rect(sx0, yy-3*k, w, 3.6*k, 'FD'); }
+      else if(Lr.cls.has('line')){ doc.setDrawColor(cr,cg,cb); doc.setLineWidth(Math.max(0.3,Lr.width)*k); doc.line(sx0, yy-1.2*k, sx0+w, yy-1.2*k); }
+      if(Lr.cls.has('point')){ doc.setFillColor(cr,cg,cb); doc.circle(sx0+w/2, yy-1.2*k, Math.min(2.2, Lr.ptSize/2)*k, 'F'); }
+      doc.setTextColor(...ink); doc.text(T(doc.splitTextToSize(T(Lr.name), r.w-2*pad-w-3*k)[0]), sx0+w+3*k, yy); yy += rowH; } }
+  // Datos
+  box(R_.d,'DATOS DEL MAPA'); { const r = R_.d; doc.setFontSize(7*k); let yy = r.y+6*k+3.6*k;
+    for(const [a_,b_] of dataLines){ const bl = doc.splitTextToSize(T(b_), r.w-2*pad); if(yy+3.2*k+bl.length*3*k > r.y+r.h+1*k) break;
+      doc.setFont('helvetica','bold'); doc.setTextColor(...brand); doc.text(T(a_), r.x+pad, yy); yy+=3.2*k;
+      doc.setFont('helvetica','normal'); doc.setTextColor(...ink); doc.text(bl, r.x+pad, yy); yy += bl.length*3*k + 1*k; } }
+  // Pie de página
+  doc.setFont('helvetica','normal'); doc.setFontSize(7*k); doc.setTextColor(110);
+  doc.text(T('Generado con el Generador de Mapas Base · Geospatial Engineering Tools'), P.W-P.m-1*k, P.H-P.m-1.8*k, {align:'right'});
+  doc.text(T(`Hoja ${P.sheet} · PDF georreferenciado (ISO 32000) · Elaborado por Ing. Geodesta Mario Forgione L.`), P.m+1*k, P.H-P.m-1.8*k);
+  // Georreferenciación con pdf-lib
+  bar.style.width='97%';
+  const bytes = doc.output('arraybuffer'), {PDFDocument, PDFName, PDFString} = window.PDFLib;
+  const pdf = await PDFDocument.load(bytes), page = pdf.getPage(0), ctx = pdf.context, pt = 72/25.4, Hpt = page.getHeight();
+  const bx1 = P.fx*pt, bx2 = (P.fx+P.fw)*pt, by1 = Hpt-(P.fy+P.fh)*pt, by2 = Hpt-P.fy*pt;
+  const [laLL,loLL] = unmerc(E.x0,E.y0), [laUR,loUR] = unmerc(E.x1,E.y1);
+  const gcs = ctx.obj({Type:'PROJCS', WKT:PDFString.of(WKT3857), EPSG:3857});
+  const measure = ctx.obj({Type:'Measure', Subtype:'GEO', Bounds:[0,0,0,1,1,1,1,0],
+    GPTS:[laLL,loLL, laUR,loLL, laUR,loUR, laLL,loUR], LPTS:[0,0,0,1,1,1,1,0], GCS:gcs, PDU:['M','SQM','DEG']});
+  const vp = ctx.obj({Type:'Viewport', BBox:[bx1,by1,bx2,by2], Name:PDFString.of('Mapa'), Measure:measure});
+  page.node.set(PDFName.of('VP'), ctx.obj([vp]));
+  pdf.setTitle($('pTitle').value.trim()||'Mapa base'); pdf.setAuthor($('pAuthor').value.trim()||'Generador de Mapas Base'); pdf.setCreator('Geospatial Engineering Tools - Generador de Mapas Base');
+  pdf.setSubject(`Mapa base georreferenciado · Escala 1:${curScale()} · Hoja ${P.sheet}`); pdf.setKeywords(['GET-MAPAS-BASE', `escala=${curScale()}`, `hoja=${P.sheet}`, 'EPSG:3857']); pdf.setProducer('Geospatial Engineering Tools');
+  const out = await pdf.save(); bar.style.width='100%';
+  return {out, F, E};
+}
+function hexRgb(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function blendWhite(c,a){ return c.map(v=>Math.round(255-(255-v)*Math.min(1,Math.max(0,a)))); }
+function download(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+
+/* =====================================================================
+   EVENTOS
+   ===================================================================== */
+(function init(){
+  $('pScale').innerHTML = SCALES.map(s=>`<option value="${s}" ${s===5000?'selected':''}>1:${fmtN(s)}</option>`).join('');
+  initMap(); renderLayers(); updateFrame();
+  const drop=$('drop'), inp=$('file');
+  drop.addEventListener('click', ()=>inp.click());
+  drop.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } });
+  inp.addEventListener('change', ()=>{ addFiles(inp.files); inp.value=''; });
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e=>addFiles(e.dataTransfer.files));
+  $('layers').addEventListener('input', e=>{ const el=e.target, card=el.closest('.layer'); if(!card||!el.dataset.k) return; const Lr=M.layers[+card.dataset.i], k=el.dataset.k;
+    Lr[k] = el.type==='checkbox' ? el.checked : el.type==='number' ? +el.value : el.value;
+    if(k==='crs'){ layerToWgs(Lr); Lr.det.sure=true; }
+    drawPreview(); });
+  $('layers').addEventListener('click', e=>{ const b=e.target.closest('button[data-a]'); if(!b) return; const i=+b.closest('.layer').dataset.i;
+    if(b.dataset.a==='del') M.layers.splice(i,1); if(b.dataset.a==='up' && i>0) [M.layers[i-1],M.layers[i]]=[M.layers[i],M.layers[i-1]];
+    renderLayers(); drawPreview(); });
+  $('pBase').addEventListener('change', ()=>{ setBase(); updateFrame(); });
+  ['pSheet','pScale','pGrid','pGridInt'].forEach(id=>$(id).addEventListener('change', updateFrame));
+  $('pOrient').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return; M.orient=b.dataset.v; $('pOrient').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b))); updateFrame(); });
+  $('bFit').addEventListener('click', fitAll);
+  $('bGo').addEventListener('click', async ()=>{
+    clearMsgs('outMsgs'); $('bGo').disabled=true;
+    try{ const {out, F} = await makePdf(); const name = `mapa_${(($('pTitle').value.trim()||'base').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w-]+/g,'_')).slice(0,60)}_${$('pSheet').value}.pdf`;
+      download(new Blob([out],{type:'application/pdf'}), name);
+      addMsg('outMsgs','ok',`PDF georreferenciado generado: ${name}. Ábralo en Avenza Maps con «Importar mapa».`);
+      if(F.used==='osm' && $('pBase').value!=='osm') addMsg('outMsgs','warn','Esri no tenía imagen para esta zona y escala: el fondo se tomó de OpenStreetMap.');
+      else if(F.z!==tileZoom(frameExtent(M.map.getCenter(),curScale()))) addMsg('outMsgs','info',`No había imagen al nivel de detalle ideal; se usó el nivel ${F.z}, que puede verse menos nítido.`);
+    }catch(err){ addMsg('outMsgs','err', err.message==='tile' ? 'No se pudieron descargar las teselas del fondo. Revise la conexión a internet.' : (err.message||String(err))); }
+    finally{ $('bGo').disabled=false; setTimeout(()=>{ $('prog').hidden=true; }, 1200); }
+  });
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

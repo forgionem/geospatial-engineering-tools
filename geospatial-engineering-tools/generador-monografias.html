@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generador de Monografías</title>
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Generación de monografías de vértices geodésicos en PDF, con conversión geográficas ⇄ UTM, croquis satelital automático y carga por lotes desde plantilla Excel.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:18px 28px}
+.wrap{max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+header h1{font-family:var(--f-disp); font-weight:800; font-size:clamp(22px,4vw,30px); letter-spacing:.04em; color:var(--brand); margin:0; line-height:1.05; text-transform:uppercase; text-wrap:balance}
+header h1 .u{color:var(--accent)}
+.sub{color:var(--muted); margin:8px 0 0; font-size:13.5px; max-width:80ch}
+.by{font:500 12px var(--f-mono); margin-top:8px}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+.sec{padding:14px 16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:12px; min-width:0}
+.sec:first-child{border-top:0}
+.ptitle{display:flex; gap:10px; align-items:baseline; margin:0; font:700 14px var(--f-disp); letter-spacing:.06em; text-transform:uppercase; color:var(--brand)}
+.ptitle .n{font:500 12px var(--f-mono); color:var(--accent)}
+.lbl{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+.note{font-size:12.5px; color:var(--muted); margin:0}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px 14px}
+.grid.g3{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.f{display:flex; flex-direction:column; gap:4px; min-width:0}
+.f.span2{grid-column:span 2} @media (max-width:520px){.f.span2{grid-column:auto}}
+.f.full{grid-column:1/-1}
+.f label{font-size:12px; color:var(--muted)}
+input[type=text],input[type=number],select,textarea{width:100%; font:500 13.5px var(--f-body); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px; min-width:0}
+textarea{min-height:64px; resize:vertical; font-weight:400}
+input.mono{font-family:var(--f-mono)}
+input[type=color]{width:100%; height:38px; border:1px solid var(--line); border-radius:5px; background:var(--field); padding:3px}
+.btns{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.btn{font:600 13px var(--f-body); padding:8px 12px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.sec2{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn.pri{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font:700 13px var(--f-disp); letter-spacing:.06em; text-transform:uppercase; padding:11px 16px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+.btn.sm{padding:5px 9px; font-size:12px}
+.btn.del{color:var(--bad)}
+input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.tog{display:flex; gap:4px}
+.tog button{flex:1; font:600 12.5px var(--f-body); padding:8px; border:1px solid var(--line); background:var(--field); color:var(--ink); border-radius:5px; cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.logo-prev{height:52px; max-width:140px; object-fit:contain; border:1px solid var(--line); border-radius:4px; background:#FFF}
+
+.table-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:6px}
+table{border-collapse:collapse; width:100%; font-size:13px}
+th{text-align:left; font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:7px 8px; border-bottom:1px solid var(--line); white-space:nowrap; background:var(--panel)}
+td{padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+tr.sel td{background:var(--brandsoft)}
+tr[data-i]{cursor:pointer}
+.st{display:inline-block; font:600 10.5px var(--f-body); letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid currentColor}
+.st.ok{color:var(--ok)} .st.warn{color:var(--warn)} .st.bad{color:var(--bad)}
+.empty{padding:18px; text-align:center; color:var(--muted); font-size:13px}
+
+details.grp{border:1px solid var(--line); border-radius:6px}
+details.grp > summary{list-style:none; cursor:pointer; padding:9px 12px; font:700 12px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); display:flex}
+details.grp > summary::-webkit-details-marker{display:none}
+details.grp > summary::after{content:"+"; margin-left:auto; font:500 15px var(--f-mono); color:var(--muted)}
+details.grp[open] > summary::after{content:"–"}
+details.grp > .grid, details.grp > .inner{padding:4px 12px 12px}
+.calc{font:500 12.5px var(--f-mono); background:var(--field); border:1px solid var(--line); border-radius:6px; padding:8px 10px; white-space:pre-wrap; overflow-x:auto}
+.msgs{display:flex; flex-direction:column; gap:6px}
+.msg{font-size:12.5px; padding:7px 10px; border-radius:5px; border-left:3px solid var(--brand); background:var(--field)}
+.msg[data-l="warn"]{border-left-color:var(--warn); background:var(--warnbg)}
+.msg[data-l="bad"]{border-left-color:var(--bad); background:var(--badbg)}
+.msg[data-l="ok"]{border-left-color:var(--ok); background:var(--okbg)}
+.imgs{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px}
+@media (max-width:720px){.imgs{grid-template-columns:minmax(0,1fr)}}
+.imgbox{border:1px dashed var(--line); border-radius:6px; background:var(--field); aspect-ratio:4/3; display:grid; place-items:center; overflow:hidden; position:relative}
+.imgbox img{width:100%; height:100%; object-fit:cover; background:#FFF}
+.imgbox span{font-size:12.5px; color:var(--muted); padding:12px; text-align:center}
+
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; font-size:12.5px; display:flex; flex-direction:column; gap:5px}
+.srcs li{color:var(--muted); overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Generador de <span class="u">monografías</span></h1>
+  <p class="sub">Monografías de vértices geodésicos en PDF, una por página. Cargue la red desde la plantilla Excel o vértice por vértice: la app convierte geográficas ⇄ UTM, completa h, N y H, genera el croquis sobre imagen satelital y agrega un código QR para llegar al hito. Todo se procesa en su equipo.</p>
+  <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+</header>
+
+<!-- 01 PROYECTO -->
+<section class="panel" aria-labelledby="t1">
+  <div class="sec">
+    <h2 class="ptitle" id="t1"><span class="n">01</span>Datos comunes del proyecto</h2>
+    <div class="grid">
+      <div class="f span2"><label for="pTitle">Título de la ficha</label><input type="text" id="pTitle" value="MONOGRAFÍA DE VÉRTICE GEODÉSICO"></div>
+      <div class="f span2"><label for="pEnt">Entidad ejecutora</label><input type="text" id="pEnt"></div>
+      <div class="f span2"><label for="pProj">Proyecto</label><input type="text" id="pProj"></div>
+      <div class="f"><label for="pLogo">Logo (PNG o JPG)</label><input type="file" id="pLogo" accept="image/png,image/jpeg"></div>
+      <div class="f"><label>Vista del logo</label><div class="btns"><img id="logoPrev" class="logo-prev" alt="Logo cargado" hidden><button class="btn sm" type="button" id="bLogoDel" hidden>Quitar</button><span class="note" id="logoNone">Sin logo</span></div></div>
+      <div class="f"><label for="pPage">Tamaño de hoja</label><select id="pPage"><option value="a4">A4 (210 × 297 mm)</option><option value="letter">Carta (216 × 279 mm)</option></select></div>
+      <div class="f"><label for="pColor">Color de encabezados</label><input type="color" id="pColor" value="#D9D9D9"></div>
+      <div class="f"><label for="pElabN">Elaborado por · nombre</label><input type="text" id="pElabN"></div>
+      <div class="f"><label for="pElabC">Elaborado por · cargo</label><input type="text" id="pElabC"></div>
+      <div class="f"><label for="pSupN">Supervisado por · nombre</label><input type="text" id="pSupN"></div>
+      <div class="f"><label for="pSupC">Supervisado por · cargo</label><input type="text" id="pSupC"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 02 VÉRTICES -->
+<section class="panel" aria-labelledby="t2">
+  <div class="sec">
+    <h2 class="ptitle" id="t2"><span class="n">02</span>Vértices</h2>
+    <div class="btns">
+      <button class="btn sec2" type="button" id="bTpl">Descargar plantilla Excel</button>
+      <button class="btn" type="button" id="bLoad">Cargar plantilla (.xlsx / .csv)</button>
+      <button class="btn" type="button" id="bAdd">Agregar vértice</button>
+      <span style="flex:1"></span>
+      <button class="btn" type="button" id="bSave">Guardar proyecto</button>
+      <button class="btn" type="button" id="bOpen">Abrir proyecto</button>
+      <input type="file" id="fLoad" accept=".xlsx,.xls,.csv" hidden>
+      <input type="file" id="fOpen" accept=".json" hidden>
+    </div>
+    <div class="msgs" id="loadMsgs"></div>
+    <div class="table-scroll"><table id="tblV"></table></div>
+  </div>
+</section>
+
+<!-- 03 EDITOR -->
+<section class="panel" aria-labelledby="t3" id="editor" hidden>
+  <div class="sec">
+    <h2 class="ptitle" id="t3"><span class="n">03</span>Vértice <span id="edName" class="mono" style="color:var(--accent)"></span></h2>
+
+    <details class="grp" open><summary>Identificación y sistema de referencia</summary>
+      <div class="grid">
+        <div class="f"><label for="v_vertice">Nombre del vértice *</label><input type="text" id="v_vertice" data-k="vertice"></div>
+        <div class="f"><label for="v_tipo_orden">Tipo de orden</label><select id="v_tipo_orden" data-k="tipo_orden"><option></option><option>Primero</option><option>Segundo</option><option>Tercero</option><option>Cuarto</option></select></div>
+        <div class="f"><label for="v_fecha_determinacion">Fecha de determinación</label><input type="text" id="v_fecha_determinacion" data-k="fecha_determinacion" placeholder="dd/mm/aaaa"></div>
+        <div class="f"><label for="v_marco_referencia">Marco de referencia</label><select id="v_marco_referencia" data-k="marco_referencia"><option>SIRGAS-ECU</option><option>REGVEN</option><option>ITRF2008</option><option>ITRF2014</option><option>ITRF2020</option><option>WGS84</option></select></div>
+        <div class="f"><label for="v_epoca_referencia">Época de referencia del marco</label><input type="text" class="mono" id="v_epoca_referencia" data-k="epoca_referencia" placeholder="2016.4"></div>
+        <div class="f"><label for="eObs">Época de observación (desde la fecha)</label><input type="text" class="mono" id="eObs" readonly tabindex="-1" placeholder="se calcula con la fecha"></div>
+        <div class="f"><label for="v_referencia_vertical">Referencia vertical (mareógrafo / BM)</label><input type="text" id="v_referencia_vertical" data-k="referencia_vertical"></div>
+      </div>
+    </details>
+
+    <details class="grp" open><summary>Localización</summary>
+      <div class="grid">
+        <div class="f"><label for="v_pais">País *</label><select id="v_pais" data-k="pais"><option>Ecuador</option><option>Venezuela</option></select></div>
+        <div class="f"><label for="v_division_1" id="lbDiv1">Provincia</label><input type="text" id="v_division_1" data-k="division_1"></div>
+        <div class="f"><label for="v_division_2" id="lbDiv2">Cantón</label><input type="text" id="v_division_2" data-k="division_2"></div>
+        <div class="f"><label for="v_parroquia">Parroquia</label><input type="text" id="v_parroquia" data-k="parroquia"></div>
+        <div class="f"><label for="v_sitio">Sitio</label><input type="text" id="v_sitio" data-k="sitio"></div>
+      </div>
+    </details>
+
+    <details class="grp" open><summary>Coordenadas y alturas</summary>
+      <div class="inner" style="display:flex; flex-direction:column; gap:10px">
+        <div class="f" style="max-width:360px"><label>Coordenadas de entrada</label><div class="tog" id="v_tipo_entrada"><button type="button" data-v="GEOGRAFICAS">Geográficas</button><button type="button" data-v="UTM">UTM</button></div></div>
+        <div class="grid" id="inGeo">
+          <div class="f"><label for="v_latitud">Latitud (decimal o GMS)</label><input type="text" class="mono" id="v_latitud" data-k="latitud" placeholder="-2.170000 · S2°10'12.00000&quot;"></div>
+          <div class="f"><label for="v_longitud">Longitud (decimal o GMS)</label><input type="text" class="mono" id="v_longitud" data-k="longitud" placeholder="-79.900000 · W79°54'00.00000&quot;"></div>
+          <div class="f"><label for="v_zona_utm">Zona UTM (vacía = automática)</label><input type="text" class="mono" id="v_zona_utm" data-k="zona_utm" placeholder="auto"></div>
+        </div>
+        <div class="grid" id="inUtm">
+          <div class="f"><label for="v_este">Este (m)</label><input type="text" class="mono" id="v_este" data-k="este"></div>
+          <div class="f"><label for="v_norte">Norte (m)</label><input type="text" class="mono" id="v_norte" data-k="norte"></div>
+          <div class="f"><label for="v_zona_utm2">Zona UTM *</label><input type="text" class="mono" id="v_zona_utm2" data-k="zona_utm" placeholder="17S"></div>
+        </div>
+        <div class="grid g3">
+          <div class="f"><label for="v_altura_elipsoidal_h">h elipsoidal (m)</label><input type="text" class="mono" id="v_altura_elipsoidal_h" data-k="altura_elipsoidal_h"></div>
+          <div class="f"><label for="v_ondulacion_N">N ondulación (m)</label><input type="text" class="mono" id="v_ondulacion_N" data-k="ondulacion_N"></div>
+          <div class="f"><label for="v_cota_ortometrica_H">H ortométrica (m)</label><input type="text" class="mono" id="v_cota_ortometrica_H" data-k="cota_ortometrica_H"></div>
+          <div class="f"><label for="v_modelo_geoidal">Modelo geoidal</label><input type="text" id="v_modelo_geoidal" data-k="modelo_geoidal" placeholder="EGM2008"></div>
+        </div>
+        <div class="lbl">Resultado</div>
+        <div class="calc" id="calc"></div>
+        <div class="msgs" id="vMsgs"></div>
+      </div>
+    </details>
+
+    <details class="grp" open><summary>Datos del posicionamiento</summary>
+      <div class="grid">
+        <div class="f"><label for="v_metodo">Método</label><select id="v_metodo" data-k="metodo"><option></option><option>Estático</option><option>Estático rápido</option><option>PPK</option><option>RTK</option><option>PPP</option></select></div>
+        <div class="f"><label for="v_equipo">Equipo (receptor y antena)</label><input type="text" id="v_equipo" data-k="equipo"></div>
+        <div class="f"><label for="v_duracion_sesion">Duración de la sesión</label><input type="text" id="v_duracion_sesion" data-k="duracion_sesion"></div>
+        <div class="f"><label for="v_estaciones_referencia">Estaciones de referencia</label><input type="text" id="v_estaciones_referencia" data-k="estaciones_referencia"></div>
+        <div class="f"><label for="v_desv_E">Desv. estándar E (m)</label><input type="text" class="mono" id="v_desv_E" data-k="desv_E"></div>
+        <div class="f"><label for="v_desv_N">Desv. estándar N (m)</label><input type="text" class="mono" id="v_desv_N" data-k="desv_N"></div>
+        <div class="f"><label for="v_desv_h">Desv. estándar h (m)</label><input type="text" class="mono" id="v_desv_h" data-k="desv_h"></div>
+      </div>
+    </details>
+
+    <details class="grp" open><summary>Textos</summary>
+      <div class="grid">
+        <div class="f full"><label for="v_accesibilidad">Ubicación y accesibilidad</label><textarea id="v_accesibilidad" data-k="accesibilidad"></textarea></div>
+        <div class="f full"><label for="v_observaciones">Observaciones (monumento, dimensiones, estado)</label><textarea id="v_observaciones" data-k="observaciones"></textarea></div>
+      </div>
+    </details>
+
+    <details class="grp" open><summary>Imágenes</summary>
+      <div class="inner" style="display:flex; flex-direction:column; gap:10px">
+        <div class="imgs">
+          <div class="f"><label>Fotografía del hito</label>
+            <div class="imgbox" id="boxFoto"><span>Sin fotografía</span></div>
+            <div class="btns"><button class="btn sm" type="button" id="bFoto">Subir fotografía</button><button class="btn sm del" type="button" id="bFotoDel">Quitar</button></div>
+            <input type="file" id="fFoto" accept="image/*" hidden></div>
+          <div class="f"><label>Croquis de ubicación</label>
+            <div class="imgbox" id="boxCroq"><span>El croquis se genera con la posición del vértice</span></div>
+            <div class="btns">
+              <select id="cZoom" style="width:auto"><option value="15">Zoom 15 · ~1:18 000</option><option value="16">Zoom 16 · ~1:9 000</option><option value="17" selected>Zoom 17 · ~1:4 500</option><option value="18">Zoom 18 · ~1:2 250</option><option value="19">Zoom 19 · ~1:1 100</option></select>
+              <button class="btn sm sec2" type="button" id="bCroq">Generar croquis</button>
+              <button class="btn sm" type="button" id="bCroqUp">Subir croquis propio</button>
+            </div>
+            <input type="file" id="fCroq" accept="image/*" hidden>
+            <p class="note" id="croqNote">Imagen satelital Esri World Imagery con calles y lugares; si no carga, se usa OpenStreetMap.</p></div>
+        </div>
+      </div>
+    </details>
+    <div class="btns"><button class="btn del" type="button" id="bDel">Eliminar este vértice</button></div>
+  </div>
+</section>
+
+<!-- 04 PDF -->
+<section class="panel" aria-labelledby="t4">
+  <div class="sec">
+    <h2 class="ptitle" id="t4"><span class="n">04</span>Generar PDF</h2>
+    <p class="note">Una monografía por página. Antes de generar el lote, la app crea los croquis que falten.</p>
+    <label class="note" style="display:flex; gap:8px; align-items:center"><input type="checkbox" id="pFoot" checked style="accent-color:var(--accent)"> Incluir pie de página con número de hoja y herramienta usada</label>
+    <div class="btns">
+      <button class="btn pri" type="button" id="bPdfOne" disabled>PDF del vértice actual</button>
+      <button class="btn pri" type="button" id="bPdfAll" disabled>PDF de todos los vértices</button>
+    </div>
+    <div class="msgs" id="pdfMsgs"></div>
+  </div>
+</section>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Herramienta de apoyo para documentar vértices geodésicos. No calcula ni ajusta observaciones GNSS: las coordenadas, alturas, precisiones y datos del posicionamiento son los que ingresa el usuario, y la app solo convierte entre geográficas y UTM (GRS80, series de Krüger) y completa la relación H = h − N. El contenido de cada monografía es responsabilidad del profesional que la firma.</p>
+    <p>El croquis se compone con teselas de Esri World Imagery y capas de referencia de Esri, u OpenStreetMap como alternativa, sujetas a los términos de uso de cada proveedor; la atribución se imprime en la imagen. La fecha de la imagen satelital puede no coincidir con el estado actual del sitio.</p>
+    <p>Los archivos se procesan en el navegador y no se envían a ningún servidor; solo las solicitudes de teselas llegan a los servicios de mapas. El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+      <li class="grp">Geodesia</li>
+      <li><a href="https://doi.org/10.1007/s00190-011-0445-3" target="_blank" rel="noopener">Karney (2011) — Transverse Mercator with an accuracy of a few nanometers</a></li>
+      <li><a href="https://epsg.io/31992" target="_blank" rel="noopener">EPSG 31992 — SIRGAS 1995 / UTM 17S (Ecuador continental completo)</a> · <a href="https://epsg.io/32715" target="_blank" rel="noopener">32715 / 32716 — UTM 15S y 16S (Galápagos)</a></li>
+      <li><a href="https://epsg.io/2201" target="_blank" rel="noopener">EPSG 2201–2203 — REGVEN / UTM 18N–20N</a></li>
+      <li><a href="https://revistasipgh.org/index.php/regeofi/article/download/161/168/315" target="_blank" rel="noopener">Revista Geofísica IPGH — SIRGAS-Ecuador, época 2016.4</a></li>
+      <li class="grp">Cartografía del croquis</li>
+      <li><a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri — World Imagery</a> · <a href="https://www.arcgis.com/home/item.html?id=94f838a535334cf1aa061846514b77c7" target="_blank" rel="noopener">World Transportation</a> · World Boundaries and Places</li>
+      <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://operations.osmfoundation.org/policies/tiles/" target="_blank" rel="noopener">Política de uso de teselas OSM</a></li>
+      <li class="grp">Librerías</li>
+      <li><a href="https://github.com/parallax/jsPDF" target="_blank" rel="noopener">jsPDF</a> · <a href="https://sheetjs.com" target="_blank" rel="noopener">SheetJS</a> · <a href="https://github.com/kazuhikoarase/qrcode-generator" target="_blank" rel="noopener">qrcode-generator</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+"use strict";
+const TEMPLATE_B64 = "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";
+/* =====================================================================
+   GEODESIA: UTM (Krüger 6.º orden, Karney 2011) sobre GRS80
+   ===================================================================== */
+const D2R = Math.PI/180, GRS80 = {a:6378137, f:1/298.257222101};
+const TM = (()=>{ const f=GRS80.f, n=f/(2-f), n2=n*n, n3=n2*n, n4=n3*n, n5=n4*n, n6=n5*n;
+  return { A: GRS80.a/(1+n)*(1+n2/4+n4/64+n6/256), e: Math.sqrt(f*(2-f)),
+    al:[0, n/2-2*n2/3+5*n3/16+41*n4/180-127*n5/288+7891*n6/37800, 13*n2/48-3*n3/5+557*n4/1440+281*n5/630-1983433*n6/1935360,
+        61*n3/240-103*n4/140+15061*n5/26880+167603*n6/181440, 49561*n4/161280-179*n5/168+6601661*n6/7257600,
+        34729*n5/80640-3418889*n6/1995840, 212378941*n6/319334400],
+    be:[0, n/2-2*n2/3+37*n3/96-n4/360-81*n5/512+96199*n6/604800, n2/48+n3/15-437*n4/1440+46*n5/105-1118711*n6/3870720,
+        17*n3/480-37*n4/840-209*n5/4480+5569*n6/90720, 4397*n4/161280-11*n5/504-830251*n6/7257600,
+        4583*n5/161280-108847*n6/3991680, 20648693*n6/638668800] }; })();
+const cmOf = z => z*6-183, K0 = 0.9996;
+function utmFwd(lat, lon, zone, south){
+  const c=TM, phi=lat*D2R, lam=(lon-cmOf(zone))*D2R, sp=Math.sin(phi);
+  const t=Math.sinh(Math.atanh(sp)-c.e*Math.atanh(c.e*sp)), xp=Math.atan2(t,Math.cos(lam)), ep=Math.atanh(Math.sin(lam)/Math.sqrt(1+t*t));
+  let xi=xp, eta=ep; for(let j=1;j<=6;j++){ xi+=c.al[j]*Math.sin(2*j*xp)*Math.cosh(2*j*ep); eta+=c.al[j]*Math.cos(2*j*xp)*Math.sinh(2*j*ep); }
+  return [500000+K0*c.A*eta, (south?1e7:0)+K0*c.A*xi];
+}
+function utmInv(E, N, zone, south){
+  const c=TM, xi=(N-(south?1e7:0))/(K0*c.A), eta=(E-500000)/(K0*c.A);
+  let xp=xi, ep=eta; for(let j=1;j<=6;j++){ xp-=c.be[j]*Math.sin(2*j*xi)*Math.cosh(2*j*eta); ep-=c.be[j]*Math.cos(2*j*xi)*Math.sinh(2*j*eta); }
+  const tp=Math.sin(xp)/Math.sqrt(Math.sinh(ep)**2+Math.cos(xp)**2), e2=c.e*c.e; let tau=tp;
+  for(let i=0;i<10;i++){ const s=Math.sinh(c.e*Math.atanh(c.e*tau/Math.sqrt(1+tau*tau))), ti=tau*Math.sqrt(1+s*s)-s*Math.sqrt(1+tau*tau);
+    const d=(tp-ti)/Math.sqrt(1+ti*ti)*(1+(1-e2)*tau*tau)/((1-e2)*Math.sqrt(1+tau*tau)); tau+=d; if(Math.abs(d)<1e-14) break; }
+  return [Math.atan(tau)/D2R, cmOf(zone)+Math.atan2(Math.sinh(ep),Math.cos(xp))/D2R];
+}
+const ZONES = { Ecuador:['15N','15S','16N','16S','17N','17S','18N','18S'], Venezuela:['18N','19N','20N'] };
+function autoZone(pais, lat, lon){
+  let z = Math.floor((lon+180)/6)+1, zs = z+(lat<0?'S':'N');
+  const list = ZONES[pais]; if(!list) return zs;
+  if(list.includes(zs)) return zs;
+  const nums = list.map(s=>parseInt(s,10)); z = Math.min(Math.max(z, Math.min(...nums)), Math.max(...nums));
+  zs = z+(lat<0?'S':'N'); return list.includes(zs) ? zs : list.find(s=>parseInt(s,10)===z);
+}
+/* Ángulos: decimal o GMS con letra / signo */
+function parseAngle(s, isLat){
+  if(s===null || s===undefined) return NaN;
+  if(typeof s==='number') return s;
+  const t = String(s).trim().toUpperCase().replace(/,/g,'.');
+  if(!t) return NaN;
+  const neg = t.startsWith('-') || /[SW]/.test(t) || (!isLat && /O/.test(t));
+  const nums = t.replace(/[NSEWO]/g,' ').replace(/[°º'’"”″′:]/g,' ').replace(/^-/,'').trim().split(/\s+/).filter(Boolean).map(Number);
+  if(!nums.length || nums.length>3 || nums.some(Number.isNaN)) return NaN;
+  const v = nums[0] + (nums[1]||0)/60 + (nums[2]||0)/3600;
+  return neg ? -v : v;
+}
+function gms(v, isLat){
+  const h = isLat ? (v<0?'S':'N') : (v<0?'W':'E'); let a = Math.abs(v);
+  let d = Math.floor(a), m = Math.floor((a-d)*60), s = ((a-d)*60-m)*60;
+  if(+s.toFixed(5)>=60){ s=0; m++; } if(m>=60){ m=0; d++; }
+  return `${h}${d}°${String(m).padStart(2,'0')}'${s.toFixed(5).padStart(8,'0')}"`;
+}
+const num = s => { if(s===null||s===undefined) return NaN; if(typeof s==='number') return s; const t=String(s).trim().replace(/\s/g,'').replace(',', '.'); return t===''?NaN:Number(t); };
+const BOX = { Ecuador:[[-5.2,1.9,-81.3,-75.0],[-1.8,1.9,-92.3,-89.0]], Venezuela:[[0.4,16.0,-73.8,-59.2]] };
+const inCountry = (p,la,lo) => (BOX[p]||[]).some(b=>la>=b[0]&&la<=b[1]&&lo>=b[2]&&lo<=b[3]);
+
+/* =====================================================================
+   MODELO
+   ===================================================================== */
+const FIELDS = ['vertice','tipo_orden','fecha_determinacion','pais','division_1','division_2','parroquia','sitio','marco_referencia','epoca_referencia','tipo_entrada','latitud','longitud','este','norte','zona_utm','altura_elipsoidal_h','ondulacion_N','cota_ortometrica_H','modelo_geoidal','referencia_vertical','metodo','equipo','duracion_sesion','estaciones_referencia','desv_E','desv_N','desv_h','accesibilidad','observaciones'];
+const S = { V:[], sel:-1, logo:null };
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function blank(){ const v={}; FIELDS.forEach(k=>v[k]=''); v.pais='Ecuador'; v.marco_referencia='SIRGAS-ECU'; v.epoca_referencia='2016.4'; v.tipo_entrada='GEOGRAFICAS'; v.foto=null; v.croquis=null; v.croqBase=null; v.croqMeta=null; v.croqKey=''; return v; }
+const DIVS = { Ecuador:['Provincia','Cantón'], Venezuela:['Estado','Municipio'] };
+
+// Época de observación: año decimal a partir de la fecha (día del año a mediodía), redondeado a un decimal
+function parseDate(s){
+  const t = String(s||'').trim(); let m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(t);
+  if(m) return new Date(Date.UTC(+m[3], +m[2]-1, +m[1]));
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t); if(m) return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  return null;
+}
+function epochOf(s){
+  const d = parseDate(s); if(!d || isNaN(d)) return null;
+  const y = d.getUTCFullYear(), doy = (d - Date.UTC(y,0,1))/86400000 + 1, days = (y%4===0 && (y%100!==0 || y%400===0)) ? 366 : 365;
+  if(d.getUTCDate()!==+String(s).trim().split(/[\/.-]/)[0] && /^\d{1,2}[\/.-]/.test(String(s).trim())) return null; // fecha inexistente (ej. 31/02)
+  return (y + (doy-0.5)/days).toFixed(1);
+}
+function compute(v){
+  const m = [], r = {ok:false};
+  if(!String(v.vertice).trim()) m.push(['bad','Falta el nombre del vértice.']);
+  const pais = v.pais;
+  if(v.tipo_entrada==='UTM'){
+    const E = num(v.este), N = num(v.norte), zs = String(v.zona_utm||'').trim().toUpperCase();
+    const zm = /^(\d{1,2})\s*([NS])$/.exec(zs);
+    if(!Number.isFinite(E)||!Number.isFinite(N)) m.push(['bad','Faltan Este y Norte, o no son números.']);
+    else if(!zm) m.push(['bad','Con entrada UTM, la zona es obligatoria (ej. 17S, 19N).']);
+    else { const z=+zm[1], s=zm[2]==='S'; const [la,lo]=utmInv(E,N,z,s); Object.assign(r,{lat:la,lon:lo,E,N,zone:z+zm[2],ok:true}); }
+  } else {
+    const la = parseAngle(v.latitud,true), lo = parseAngle(v.longitud,false);
+    if(!Number.isFinite(la)||!Number.isFinite(lo)||Math.abs(la)>90||Math.abs(lo)>180) m.push(['bad','Latitud o longitud no válidas. Use decimal (-2.170000) o GMS (S2°10\'12.00000").']);
+    else {
+      let zs = String(v.zona_utm||'').trim().toUpperCase(); let auto=false;
+      if(!/^(\d{1,2})\s*[NS]$/.test(zs)){ zs = autoZone(pais, la, lo); auto=true; }
+      const z=parseInt(zs,10), s=zs.endsWith('S'); const [E,N]=utmFwd(la,lo,z,s);
+      Object.assign(r,{lat:la,lon:lo,E,N,zone:z+(s?'S':'N'),ok:true,auto});
+    }
+  }
+  if(r.ok){
+    const z=parseInt(r.zone,10), dl=Math.abs(r.lon-cmOf(z)), inside=inCountry(pais,r.lat,r.lon);
+    if(r.lon>0 && (pais==='Ecuador'||pais==='Venezuela')) m.push(['bad',`Longitud positiva (${r.lon.toFixed(5)}°, Este): en ${pais} la longitud es Oeste. Escríbala con signo negativo o con W/O (ej. W79°54'00").`]);
+    else if(!inCountry(pais,r.lat,r.lon)) m.push(['bad',`Las coordenadas (${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}) quedan fuera de ${pais}. Revise signos (S/N, W), la zona UTM o el país.`]);
+    if(inside && dl>3.0001) m.push(['warn',`El vértice está a ${dl.toFixed(2)}° del meridiano central de la zona ${r.zone}: zona extendida. ${pais==='Ecuador'&&r.zone==='17S'?'Es la convención oficial de Ecuador continental.':'Verifique que sea la zona deseada.'}`]);
+    if(r.zone.endsWith('S') && r.lat>0) m.push(['info',`Vértice al norte del ecuador expresado en ${r.zone}: el Norte supera 10 000 000 m.`]);
+    if(r.zone.endsWith('N') && r.lat<0) m.push(['warn',`Vértice al sur del ecuador expresado en ${r.zone}: el Norte resulta negativo.`]);
+  }
+  // Alturas: H = h − N
+  let h=num(v.altura_elipsoidal_h), Nn=num(v.ondulacion_N), H=num(v.cota_ortometrica_H), hc='';
+  const cnt=[h,Nn,H].filter(Number.isFinite).length;
+  if(cnt===2){ if(!Number.isFinite(H)){ H=h-Nn; hc='H'; } else if(!Number.isFinite(h)){ h=H+Nn; hc='h'; } else { Nn=h-H; hc='N'; } }
+  else if(cnt===3 && Math.abs(h-Nn-H)>0.005) m.push(['warn',`h − N − H = ${(h-Nn-H).toFixed(3)} m: las tres alturas no son coherentes.`]);
+  if(Number.isFinite(Nn) && !String(v.modelo_geoidal).trim()) m.push(['warn','Indique el modelo geoidal usado para N: sin él, la cota ortométrica no se puede auditar.']);
+  if(!Number.isFinite(H)) m.push(['info','Sin cota ortométrica: la ficha mostrará solo lo disponible.']);
+  Object.assign(r,{h,Nond:Nn,H,hc});
+  // Marco y épocas
+  const mr = v.marco_referencia, er = String(v.epoca_referencia).trim(), eo = epochOf(v.fecha_determinacion); r.eObs = eo;
+  if(mr==='SIRGAS-ECU' && er && !['2016.4','1995.4','2016.43'].includes(er)) m.push(['info',`SIRGAS-ECU vigente usa la época 2016.4 (anterior: 1995.4). Revise la época de referencia (${er}).`]);
+  if(mr==='REGVEN' && er && er!=='1995.4') m.push(['info',`REGVEN está definido en la época 1995.4. Revise la época de referencia (${er}).`]);
+  if(!String(v.fecha_determinacion).trim()) m.push(['info','Indique la fecha de determinación: de ella se obtiene la época de observación.']);
+  else if(!eo) m.push(['warn',`La fecha «${v.fecha_determinacion}» no es válida. Use dd/mm/aaaa.`]);
+  if(!v.metodo) m.push(['info','Indique el método de posicionamiento (estático, PPK, RTK…).']);
+  if(!v.foto) m.push(['info','Falta la fotografía del hito.']);
+  r.msgs = m; r.level = m.some(x=>x[0]==='bad') ? 'bad' : m.some(x=>x[0]==='warn') ? 'warn' : 'ok';
+  return r;
+}
+
+/* =====================================================================
+   PLANTILLA: descarga y lectura
+   ===================================================================== */
+function b64ToBlob(b64, type){ const bin=atob(b64), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return new Blob([u],{type}); }
+function download(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+function fmtDate(v){
+  if(v instanceof Date && !isNaN(v)) return `${String(v.getDate()).padStart(2,'0')}/${String(v.getMonth()+1).padStart(2,'0')}/${v.getFullYear()}`;
+  return v===null||v===undefined ? '' : String(v).trim();
+}
+async function loadTemplate(file){
+  const box = $('loadMsgs'); box.innerHTML='';
+  try{
+    if(typeof XLSX==='undefined') throw new Error('No se pudo cargar la librería SheetJS. Revise la conexión a internet.');
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array', cellDates:true});
+    const name = wb.SheetNames.find(n=>n.toUpperCase()==='VERTICES') || wb.SheetNames.find(n=>{ const r=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1})[0]||[]; return r.map(x=>String(x).trim().toLowerCase()).includes('vertice'); });
+    if(!name) throw new Error('No se encontró la hoja VERTICES ni una columna «vertice».');
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], {defval:'', raw:true});
+    let add=0, skip=0, ex=0;
+    for(const row of rows){
+      const o = {}; for(const k in row) o[String(k).trim().toLowerCase()] = row[k];
+      if(String(o.accesibilidad||'').startsWith('Fila de ejemplo')){ ex++; continue; }
+      if(!String(o.vertice||'').trim()){ skip++; continue; }
+      const v = blank();
+      for(const k of FIELDS){ const kk=k.toLowerCase(); if(kk in o && o[kk]!=='' ) v[k] = k==='fecha_determinacion' ? fmtDate(o[kk]) : (o[kk] instanceof Date ? fmtDate(o[kk]) : String(o[kk]).trim()); }
+      v.tipo_entrada = /UTM/i.test(v.tipo_entrada) ? 'UTM' : 'GEOGRAFICAS';
+      v.pais = /venez/i.test(v.pais) ? 'Venezuela' : 'Ecuador';
+      S.V.push(v); add++;
+    }
+    msg(box,'ok',`Se cargaron ${add} vértice(s) desde «${file.name}».`);
+    if(ex) msg(box,'info','Se omitió la fila de ejemplo de la plantilla.');
+    if(skip) msg(box,'info',`${skip} fila(s) sin nombre de vértice omitida(s).`);
+    if(add){ S.sel = S.V.length-add; renderList(); edit(S.sel); }
+  }catch(e){ msg(box,'bad', e.message||String(e)); }
+}
+function msg(box, l, t){ const d=document.createElement('div'); d.className='msg'; d.dataset.l=l; d.textContent=t; box.appendChild(d); }
+
+/* =====================================================================
+   LISTA Y EDITOR
+   ===================================================================== */
+function renderList(){
+  const t = $('tblV');
+  if(!S.V.length){ t.innerHTML = '<tbody><tr><td class="empty">Sin vértices. Descargue la plantilla, complétela y cárguela, o agregue un vértice a mano.</td></tr></tbody>'; }
+  else {
+    t.innerHTML = '<thead><tr><th>#</th><th>Vértice</th><th>País</th><th>Zona</th><th>Este</th><th>Norte</th><th>H</th><th>Foto</th><th>Croquis</th><th>Estado</th></tr></thead><tbody>'
+      + S.V.map((v,i)=>{ const r=compute(v); return `<tr data-i="${i}" class="${i===S.sel?'sel':''}"><td class="mono">${i+1}</td><td><b>${esc(v.vertice||'—')}</b></td><td>${esc(v.pais)}</td><td class="mono">${r.ok?r.zone:'—'}</td><td class="mono">${r.ok?r.E.toFixed(3):'—'}</td><td class="mono">${r.ok?r.N.toFixed(3):'—'}</td><td class="mono">${Number.isFinite(r.H)?r.H.toFixed(3):'—'}</td><td>${v.foto?'✓':'—'}</td><td>${v.croquis?'✓':'—'}</td><td><span class="st ${r.level}">${r.level==='ok'?'Completo':r.level==='warn'?'Revisar':'Incompleto'}</span></td></tr>`; }).join('') + '</tbody>';
+  }
+  $('bPdfAll').disabled = !S.V.length; $('bPdfOne').disabled = S.sel<0;
+}
+function edit(i){
+  S.sel = i; const v = S.V[i]; $('editor').hidden = false;
+  document.querySelectorAll('#editor [data-k]').forEach(el=>{ el.value = v[el.dataset.k] ?? ''; });
+  setEntry(v.tipo_entrada, false); setDivs(); showImgs(); refreshCalc(); renderList();
+}
+function setEntry(t, upd=true){
+  $('v_tipo_entrada').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===t)));
+  $('inGeo').hidden = t!=='GEOGRAFICAS'; $('inUtm').hidden = t!=='UTM';
+  if(upd && S.sel>=0){ S.V[S.sel].tipo_entrada = t; refreshCalc(); renderList(); }
+}
+function setDivs(){ const p = S.V[S.sel]?.pais || 'Ecuador'; $('lbDiv1').textContent = DIVS[p][0]; $('lbDiv2').textContent = DIVS[p][1]; }
+function refreshCalc(){
+  const v = S.V[S.sel], r = compute(v); $('edName').textContent = v.vertice || ''; $('eObs').value = r.eObs || '';
+  const f3 = x => Number.isFinite(x) ? x.toFixed(3)+' m' : '—';
+  $('calc').textContent = r.ok
+    ? `Latitud   ${gms(r.lat,true)}   (${r.lat.toFixed(9)})\nLongitud  ${gms(r.lon,false)}   (${r.lon.toFixed(9)})\nUTM ${r.zone}${r.auto?' (automática)':''}   E ${r.E.toFixed(3)}   N ${r.N.toFixed(3)}\nh ${f3(r.h)}   N ${f3(r.Nond)}   H ${f3(r.H)}${r.hc?`   (${r.hc} calculada)`:''}`
+    : 'Complete las coordenadas para ver el resultado.';
+  const box = $('vMsgs'); box.innerHTML=''; r.msgs.forEach(([l,t])=>msg(box,l,t));
+  const key = r.ok ? `${r.lat.toFixed(7)},${r.lon.toFixed(7)},${v.vertice}` : '';
+  if(v.croquis && v.croqKey && v.croqKey!=='custom' && key!==v.croqKey) $('croqNote').textContent = 'Las coordenadas o el nombre cambiaron: vuelva a generar el croquis.';
+  else $('croqNote').textContent = 'Imagen satelital Esri World Imagery con calles y lugares; si no carga, se usa OpenStreetMap.';
+}
+function showImgs(){
+  const v = S.V[S.sel];
+  $('boxFoto').innerHTML = v.foto ? `<img src="${v.foto}" alt="Fotografía del vértice ${esc(v.vertice)}">` : '<span>Sin fotografía</span>';
+  $('boxCroq').innerHTML = v.croquis ? `<img src="${v.croquis}" alt="Croquis de ubicación del vértice ${esc(v.vertice)}">` : '<span>El croquis se genera con la posición del vértice</span>';
+}
+/* Imágenes subidas: se reducen para que el PDF no pese de más */
+function fileToImage(file, maxPx, keepPng){
+  return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onerror=()=>rej(new Error('No se pudo leer la imagen.'));
+    fr.onload=()=>{ const im=new Image(); im.onload=()=>{ const k=Math.min(1, maxPx/Math.max(im.width,im.height)); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+      const g=c.getContext('2d'); if(!keepPng){ g.fillStyle='#FFF'; g.fillRect(0,0,c.width,c.height); } g.drawImage(im,0,0,c.width,c.height);
+      res(keepPng ? c.toDataURL('image/png') : c.toDataURL('image/jpeg',0.86)); }; im.onerror=()=>rej(new Error('Formato de imagen no compatible.')); im.src=fr.result; };
+    fr.readAsDataURL(file); });
+}
+
+/* =====================================================================
+   CROQUIS (teselas → canvas)
+   ===================================================================== */
+const SRC = {
+  esri:{ base:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    over:['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
+    attr:'Imagen: Esri, Maxar, Earthstar Geographics y comunidad de usuarios SIG · Referencias: Esri' },
+  osm:{ base:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', over:[], attr:'© OpenStreetMap contributors' }
+};
+const tileURL = (t,z,x,y) => t.replace('{z}',z).replace('{x}',x).replace('{y}',y);
+function loadImg(url){ return new Promise((res,rej)=>{ const im=new Image(); im.crossOrigin='anonymous'; const to=setTimeout(()=>rej(new Error('timeout')),10000);
+  im.onload=()=>{ clearTimeout(to); res(im); }; im.onerror=()=>{ clearTimeout(to); rej(new Error('tile')); }; im.src=url; }); }
+// Esri entrega teselas de relleno grises ("Map data not yet available") donde no hay imagen para ese zoom
+function isPlaceholder(im){
+  try{ const c=document.createElement('canvas'); c.width=c.height=32; const g=c.getContext('2d'); g.drawImage(im,0,0,32,32);
+    const d=g.getImageData(0,0,32,32).data; let gray=0;
+    for(let i=0;i<d.length;i+=4){ const r=d[i],gg=d[i+1],b=d[i+2]; if(Math.abs(r-gg)<8 && Math.abs(gg-b)<8 && r>185 && r<225) gray++; }
+    return gray/(d.length/4) > 0.8; }catch(e){ return false; }
+}
+async function drawTiles(g, src, z, x0, y0, W, H, optional, check){
+  const tx0=Math.floor(x0/256), ty0=Math.floor(y0/256), tx1=Math.floor((x0+W)/256), ty1=Math.floor((y0+H)/256), jobs=[];
+  for(let tx=tx0;tx<=tx1;tx++) for(let ty=ty0;ty<=ty1;ty++) jobs.push(loadImg(tileURL(src,z,tx,ty)).then(im=>({im,tx,ty})).catch(e=>{ if(optional) return null; throw e; }));
+  const tiles = await Promise.all(jobs);
+  if(check){ const ph = tiles.filter(t=>t && isPlaceholder(t.im)).length; if(ph/tiles.length > 0.4) throw new Error('placeholder'); }
+  for(const t of tiles) if(t) g.drawImage(t.im, t.tx*256-x0, t.ty*256-y0, 256, 256);
+}
+// Mapa base cuadrado centrado en el vértice; los elementos gráficos se dibujan al recortar al formato del recuadro
+const CB = 1400;
+async function makeCroquis(v, r, zoom){
+  const W=CB, H=CB, c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
+  const geo = z => { const n=256*2**z, x=(r.lon+180)/360*n, phi=r.lat*D2R, y=(1-Math.log(Math.tan(phi)+1/Math.cos(phi))/Math.PI)/2*n; return {z, x, y, x0:Math.round(x-W/2), y0:Math.round(y-H/2), phi}; };
+  let used=null, G=null;
+  for(let z=zoom; z>=Math.max(13, zoom-3) && !used; z--){
+    G = geo(z); g.clearRect(0,0,W,H);
+    try{ await drawTiles(g, SRC.esri.base, z, G.x0, G.y0, W, H, false, true); for(const o of SRC.esri.over) await drawTiles(g, o, z, G.x0, G.y0, W, H, true, false); c.toDataURL(); used='esri'; }
+    catch(e){ if(e.message!=='placeholder') break; }
+  }
+  if(!used){ G = geo(Math.min(zoom,19)); g.clearRect(0,0,W,H); await drawTiles(g, SRC.osm.base, G.z, G.x0, G.y0, W, H, false, false); used='osm'; }
+  const mpp = 156543.03392*Math.cos(G.phi)/2**G.z;
+  return {base:c.toDataURL('image/jpeg',0.9), meta:{mpp, used, z:G.z, cx:G.x-G.x0, cy:G.y-G.y0}, used, z:G.z};
+}
+const loadData = d => new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error('Imagen no válida.')); im.src=d; });
+// Recorte centrado que llena el recuadro (sin franjas vacías)
+async function coverCrop(data, aspect, maxPx=1600){
+  const im = await loadData(data); const ia = im.width/im.height;
+  let sw = im.width, sh = im.height; if(ia > aspect) sw = sh*aspect; else sh = sw/aspect;
+  const k = Math.min(1, maxPx/Math.max(sw,sh)), c=document.createElement('canvas'); c.width=Math.round(sw*k); c.height=Math.round(sh*k);
+  c.getContext('2d').drawImage(im, (im.width-sw)/2, (im.height-sh)/2, sw, sh, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg',0.88);
+}
+async function composeCroquis(v, aspect){
+  const im = await loadData(v.croqBase), M = v.croqMeta;
+  let cw = CB, ch = CB; if(aspect>=1) ch = Math.round(CB/aspect); else cw = Math.round(CB*aspect);
+  const c=document.createElement('canvas'); c.width=cw; c.height=ch; const g=c.getContext('2d');
+  const ox = M.cx - cw/2, oy = M.cy - ch/2; g.drawImage(im, ox, oy, cw, ch, 0, 0, cw, ch);
+  const k = Math.min(cw, ch)/760, cx = cw/2, cy = ch/2, W = cw, H = ch;
+  // marcador
+  g.save(); g.lineWidth=3*k; g.strokeStyle='#FFFFFF'; g.beginPath(); g.moveTo(cx-26*k,cy); g.lineTo(cx-9*k,cy); g.moveTo(cx+9*k,cy); g.lineTo(cx+26*k,cy); g.moveTo(cx,cy-26*k); g.lineTo(cx,cy-9*k); g.moveTo(cx,cy+9*k); g.lineTo(cx,cy+26*k); g.stroke();
+  g.lineWidth=1.5*k; g.strokeStyle='#ED6D15'; g.stroke();
+  g.beginPath(); g.arc(cx,cy,8*k,0,2*Math.PI); g.fillStyle='#ED6D15'; g.fill(); g.lineWidth=3*k; g.strokeStyle='#FFFFFF'; g.stroke(); g.restore();
+  // etiqueta
+  const label = String(v.vertice||'');
+  g.font=`bold ${24*k}px Arial`; const tw=g.measureText(label).width+20*k;
+  g.fillStyle='rgba(255,255,255,0.92)'; g.fillRect(cx+16*k, cy-46*k, tw, 34*k); g.strokeStyle='#ED6D15'; g.lineWidth=2*k; g.strokeRect(cx+16*k, cy-46*k, tw, 34*k);
+  g.fillStyle='#0F2A40'; g.textBaseline='middle'; g.fillText(label, cx+26*k, cy-29*k);
+  // norte
+  g.save(); g.translate(W-52*k, 60*k); g.scale(k,k); g.fillStyle='rgba(255,255,255,0.9)'; g.beginPath(); g.arc(0,0,36,0,2*Math.PI); g.fill();
+  g.fillStyle='#0F2A40'; g.beginPath(); g.moveTo(0,-26); g.lineTo(12,14); g.lineTo(0,6); g.lineTo(-12,14); g.closePath(); g.fill();
+  g.font='bold 18px Arial'; g.textAlign='center'; g.textBaseline='alphabetic'; g.fillText('N',0,27); g.restore();
+  // escala
+  const mpp = M.mpp, target = mpp*220*k, pow = 10**Math.floor(Math.log10(target)), nice = [1,2,5,10].map(q=>q*pow).filter(q=>q<=target).pop(), px = nice/mpp;
+  g.fillStyle='rgba(255,255,255,0.9)'; g.fillRect(16*k, H-62*k, px+28*k, 46*k);
+  g.fillStyle='#0F2A40'; g.fillRect(30*k, H-30*k, px/2, 7*k); g.strokeStyle='#0F2A40'; g.lineWidth=1.5*k; g.strokeRect(30*k, H-30*k, px, 7*k);
+  g.font=`${16*k}px Arial`; g.textAlign='left'; g.textBaseline='alphabetic'; g.fillText('0', 26*k, H-38*k); g.textAlign='right'; g.fillText(nice>=1000?`${nice/1000} km`:`${nice} m`, 30*k+px+6*k, H-38*k);
+  // atribución (se reduce si no cabe)
+  const at = (M.used==='esri'?SRC.esri:SRC.osm).attr; let fs = 13*k; g.font=`${fs}px Arial`;
+  while(g.measureText(at).width+12*k > W*0.98 && fs>6){ fs-=0.5; g.font=`${fs}px Arial`; }
+  const aw=g.measureText(at).width+12*k;
+  g.fillStyle='rgba(255,255,255,0.85)'; g.fillRect(W-aw, H-fs-9*k, aw, fs+9*k); g.fillStyle='#333'; g.textAlign='left'; g.fillText(at, W-aw+6*k, H-5*k);
+  return c.toDataURL('image/jpeg',0.88);
+}
+
+/* =====================================================================
+   PDF
+   ===================================================================== */
+// jsPDF con fuentes estándar usa WinAnsi: se normalizan caracteres fuera de ese conjunto
+const T = s => String(s??'').replace(/[−–—]/g,'-').replace(/[“”]/g,'"').replace(/[‘’]/g,"'").replace(/…/g,'...').replace(/[^\x00-\xFF€]/g,'?');
+function hexRgb(h){ const m=/^#?([0-9a-f]{6})$/i.exec(h); const n=parseInt(m?m[1]:'D9D9D9',16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function imgFmt(d){ return /^data:image\/png/.test(d) ? 'PNG' : 'JPEG'; }
+function imgSize(d){ return new Promise(res=>{ const im=new Image(); im.onload=()=>res([im.width,im.height]); im.onerror=()=>res([4,3]); im.src=d; }); }
+function qrDataURL(text){
+  if(typeof qrcode==='undefined') return null;
+  const q=qrcode(0,'M'); q.addData(text); q.make(); const n=q.getModuleCount(), s=6, b=2, c=document.createElement('canvas'); c.width=c.height=(n+2*b)*s;
+  const g=c.getContext('2d'); g.fillStyle='#FFF'; g.fillRect(0,0,c.width,c.height); g.fillStyle='#000';
+  for(let y=0;y<n;y++) for(let x=0;x<n;x++) if(q.isDark(y,x)) g.fillRect((x+b)*s,(y+b)*s,s,s);
+  return c.toDataURL('image/png');
+}
+async function buildPdf(list){
+  if(!window.jspdf) throw new Error('No se pudo cargar la librería jsPDF. Revise la conexión a internet.');
+  const P = proj(), doc = new window.jspdf.jsPDF({unit:'mm', format:P.page, compress:true});
+  const PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight(), M = 10, W = PW-2*M;
+  const HF = hexRgb(P.color), lum = (0.299*HF[0]+0.587*HF[1]+0.114*HF[2]), HT = lum<140 ? [255,255,255] : [15,15,15];
+  const logoSz = P.logo ? await imgSize(P.logo) : null;
+  for(let pi=0; pi<list.length; pi++){
+    const v = list[pi], r = compute(v);
+    if(pi) doc.addPage();
+    doc.setLineWidth(0.2); doc.setDrawColor(0);
+    let y = M;
+    const cell = (x,yy,w,h,txt,o={}) => {
+      if(o.fill){ doc.setFillColor(...HF); doc.rect(x,yy,w,h,'FD'); doc.setTextColor(...HT); } else { doc.rect(x,yy,w,h); doc.setTextColor(20); }
+      if(txt!==undefined && txt!==null && txt!==''){
+        doc.setFont('helvetica', o.bold?'bold':'normal'); doc.setFontSize(o.size||7.5);
+        const lines = doc.splitTextToSize(T(txt), w-2.4); const lh = (o.size||7.5)*0.36;
+        const ty = yy + h/2 - (lines.length-1)*lh/2 + (o.size||7.5)*0.12;
+        doc.text(lines, o.left ? x+1.4 : x+w/2, ty, {align:o.left?'left':'center'});
+      }
+    };
+    const bar = (txt) => { cell(M,y,W,5.5,txt,{fill:true,bold:true,size:8}); y+=5.5; };
+    // Título
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(15);
+    cell(M,y,W,10,P.title,{bold:true,size:13}); y+=10;
+    // Encabezado: logo + 6 filas
+    const LW = 34, RH = 6, GX = M+LW, GW = W-LW, y0 = y;
+    doc.rect(M,y,LW,RH*6);
+    if(P.logo){ const [iw,ih]=logoSz, bw=LW-4, bh=RH*6-4, k=Math.min(bw/iw,bh/ih); doc.addImage(P.logo, imgFmt(P.logo), M+2+(bw-iw*k)/2, y+2+(bh-ih*k)/2, iw*k, ih*k); }
+    const lab = GW*0.22, val = GW*0.28;
+    const row1 = (l,v1) => { cell(GX,y,lab,RH,l,{fill:true,bold:true,size:7}); cell(GX+lab,y,GW-lab,RH,v1,{size:7.5}); y+=RH; };
+    const row2 = (l1,v1,l2,v2) => { cell(GX,y,lab,RH,l1,{fill:true,bold:true,size:7}); cell(GX+lab,y,val,RH,v1,{size:7.5}); cell(GX+lab+val,y,lab,RH,l2,{fill:true,bold:true,size:7}); cell(GX+2*lab+val,y,GW-2*lab-val,RH,v2,{size:7.5}); y+=RH; };
+    row1('ENTIDAD EJECUTORA', P.ent);
+    row1('PROYECTO', P.proj);
+    row2('NOMBRE DEL VÉRTICE', v.vertice, 'TIPO DE ORDEN', v.tipo_orden);
+    row2('MARCO DE REFERENCIA', v.marco_referencia, 'ÉPOCA DE REFERENCIA', v.epoca_referencia);
+    row2('PROYECCIÓN / ZONA', r.ok?`UTM ${r.zone}`:'', 'ÉPOCA DE OBSERVACIÓN', r.eObs||'');
+    row2('FECHA DE DETERMINACIÓN', v.fecha_determinacion, 'REFERENCIA VERTICAL', v.referencia_vertical);
+    y = y0 + RH*6 + 2;
+    // Localización
+    bar('LOCALIZACIÓN DEL PUNTO');
+    const d = DIVS[v.pais]||DIVS.Ecuador, c5 = W/5;
+    ['PAÍS',d[0].toUpperCase(),d[1].toUpperCase(),'PARROQUIA','SITIO'].forEach((t,i)=>cell(M+i*c5,y,c5,5,t,{bold:true,size:7})); y+=5;
+    [v.pais,v.division_1,v.division_2,v.parroquia,v.sitio].forEach((t,i)=>cell(M+i*c5,y,c5,6,String(t||'').toUpperCase(),{size:7.5})); y+=6+2;
+    // Coordenadas
+    bar('CONTROL HORIZONTAL Y VERTICAL');
+    const gw = W*0.5, uw = W-gw, f3 = x=>Number.isFinite(x)?x.toFixed(3):'';
+    cell(M,y,gw,5,`COORDENADAS GEOGRÁFICAS · ${v.marco_referencia}${v.epoca_referencia?' (ÉPOCA '+v.epoca_referencia+')':''}`,{fill:true,bold:true,size:7});
+    cell(M+gw,y,uw,5,`COORDENADAS PROYECTADAS · UTM ${r.ok?r.zone:''}`,{fill:true,bold:true,size:7}); y+=5;
+    cell(M,y,gw/2,5,'LATITUD',{bold:true,size:7}); cell(M+gw/2,y,gw/2,5,'LONGITUD',{bold:true,size:7});
+    cell(M+gw,y,uw/2,5,'ESTE (m)',{bold:true,size:7}); cell(M+gw+uw/2,y,uw/2,5,'NORTE (m)',{bold:true,size:7}); y+=5;
+    cell(M,y,gw/2,6,r.ok?gms(r.lat,true):'',{size:8}); cell(M+gw/2,y,gw/2,6,r.ok?gms(r.lon,false):'',{size:8});
+    cell(M+gw,y,uw/2,6,r.ok?r.E.toFixed(3):'',{size:8}); cell(M+gw+uw/2,y,uw/2,6,r.ok?r.N.toFixed(3):'',{size:8}); y+=6;
+    const c4 = W/4;
+    ['ALTURA ELIPSOIDAL h (m)', `ONDULACIÓN N (m)${v.modelo_geoidal?' · '+v.modelo_geoidal:''}`, 'COTA ORTOMÉTRICA H (m)', 'DESV. ESTÁNDAR E / N / h (m)'].forEach((t,i)=>cell(M+i*c4,y,c4,5,t,{bold:true,size:6.8})); y+=5;
+    const sd = [v.desv_E,v.desv_N,v.desv_h].map(s=>{ const n=num(s); return Number.isFinite(n)?n.toFixed(3):'—'; }).join(' / ');
+    [f3(r.h)+(r.hc==='h'?' *':''), f3(r.Nond)+(r.hc==='N'?' *':''), f3(r.H)+(r.hc==='H'?' *':''), [v.desv_E,v.desv_N,v.desv_h].some(s=>String(s).trim())?sd:''].forEach((t,i)=>cell(M+i*c4,y,c4,6,t,{size:8})); y+=6;
+    // Posicionamiento
+    ['MÉTODO','EQUIPO','DURACIÓN DE LA SESIÓN','ESTACIONES DE REFERENCIA'].forEach((t,i)=>cell(M+i*c4,y,c4,5,t,{bold:true,size:7})); y+=5;
+    [v.metodo,v.equipo,v.duracion_sesion,v.estaciones_referencia].forEach((t,i)=>cell(M+i*c4,y,c4,6,t,{size:7.2})); y+=6;
+    if(r.hc){ doc.setFont('helvetica','italic'); doc.setFontSize(6); doc.setTextColor(80); doc.text(T(`* Valor calculado con H = h - N.`), M, y+2.6); }
+    y += 4;
+    // Bloques de texto (alto según contenido) y firmas: se miden antes de dimensionar las imágenes
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    const QR = 22, accW = W-QR-2;
+    const accL = doc.splitTextToSize(T(v.accesibilidad||''), accW-3), obsL = doc.splitTextToSize(T(v.observaciones||''), W-3);
+    const accH = Math.max(QR+2, accL.length*3+4), obsH = Math.max(12, obsL.length*3+4), signH = 5+16+6;
+    const imgH = Math.max(55, PH - M - y - (5.5+5.5) - (5.5+accH) - (5.5+obsH) - 2 - signH);
+    // Imágenes
+    bar('UBICACIÓN DEL PUNTO');
+    const half = W/2;
+    doc.rect(M,y,half,imgH); doc.rect(M+half,y,half,imgH);
+    const putImg = async (data, x, yy, w, h) => { if(!data) return; const [iw,ih]=await imgSize(data); const k=Math.min((w-3)/iw,(h-3)/ih); doc.addImage(data, imgFmt(data), x+(w-iw*k)/2, yy+(h-ih*k)/2, iw*k, ih*k); };
+    const ins = 0.25, bw = half-2*ins, bh = imgH-2*ins, asp = bw/bh;
+    if(v.foto) doc.addImage(await coverCrop(v.foto, asp), 'JPEG', M+ins, y+ins, bw, bh); else { doc.setFontSize(8); doc.setTextColor(150); doc.text('Sin fotografía', M+half/2, y+imgH/2, {align:'center'}); }
+    const croq = v.croqBase && v.croqMeta ? await composeCroquis(v, asp) : v.croquis ? await coverCrop(v.croquis, asp) : null;
+    if(croq) doc.addImage(croq, 'JPEG', M+half+ins, y+ins, bw, bh); else { doc.setFontSize(8); doc.setTextColor(150); doc.text('Sin croquis', M+half+half/2, y+imgH/2, {align:'center'}); }
+    doc.setDrawColor(0); doc.setLineWidth(0.2); doc.rect(M,y,half,imgH); doc.rect(M+half,y,half,imgH);
+    y += imgH;
+    cell(M,y,half,5.5,'FOTOGRAFÍA DEL HITO',{bold:true,size:7}); cell(M+half,y,half,5.5,'CROQUIS DE UBICACIÓN',{bold:true,size:7}); y+=5.5;
+    // Accesibilidad + QR
+    bar('UBICACIÓN Y ACCESIBILIDAD');
+    doc.rect(M,y,accW,accH); doc.rect(M+accW,y,W-accW,accH);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(20); doc.text(accL, M+1.5, y+3.6);
+    if(r.ok){ const q = qrDataURL(`https://www.google.com/maps?q=${r.lat.toFixed(7)},${r.lon.toFixed(7)}`); if(q){ doc.addImage(q,'PNG', M+accW+(W-accW-QR+2)/2, y+0.6, QR-2, QR-2); doc.setFontSize(5.5); doc.text('Abrir en el mapa', M+accW+(W-accW)/2, y+accH-1.2, {align:'center'}); } }
+    y += accH;
+    bar('OBSERVACIONES');
+    doc.rect(M,y,W,obsH); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(20); doc.text(obsL, M+1.5, y+3.6); y += obsH + 2;
+    // Firmas
+    cell(M,y,half,5,'ELABORADO POR',{fill:true,bold:true,size:7}); cell(M+half,y,half,5,'SUPERVISADO POR',{fill:true,bold:true,size:7}); y+=5;
+    doc.rect(M,y,half,16); doc.rect(M+half,y,half,16); y+=16;
+    cell(M,y,half,6,[P.elabN,P.elabC].filter(Boolean).join(' · '),{bold:true,size:7.5}); cell(M+half,y,half,6,[P.supN,P.supC].filter(Boolean).join(' · '),{bold:true,size:7.5}); y+=6;
+    if(P.foot){ doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(110);
+      doc.text(T(`Hoja ${pi+1} de ${list.length}`), M, PH-5); doc.text(T('Generado con el Generador de Monografías · Geospatial Engineering Tools'), PW-M, PH-5, {align:'right'}); }
+  }
+  return doc;
+}
+function proj(){ return { title:$('pTitle').value.trim()||'MONOGRAFÍA DE VÉRTICE GEODÉSICO', ent:$('pEnt').value, proj:$('pProj').value, logo:S.logo, page:$('pPage').value,
+  color:$('pColor').value, elabN:$('pElabN').value, elabC:$('pElabC').value, supN:$('pSupN').value, supC:$('pSupC').value, foot:$('pFoot').checked }; }
+const safe = s => String(s||'monografia').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.-]+/g,'_');
+async function ensureCroquis(list, box){
+  let n=0;
+  for(const v of list){
+    const r = compute(v); if(!r.ok) continue;
+    if(!inCountry(v.pais, r.lat, r.lon)){ msg(box,'warn',`${v.vertice}: sin croquis, las coordenadas quedan fuera de ${v.pais}.`); continue; }
+    const key = `${r.lat.toFixed(7)},${r.lon.toFixed(7)},${v.vertice}`;
+    if(v.croquis && (v.croqKey==='custom' || v.croqKey===key)) continue;
+    try{ const out = await makeCroquis(v, r, +(v.zoom||17)); v.croqBase = out.base; v.croqMeta = out.meta; v.croquis = await composeCroquis(v, 4/3); v.croqKey = key; n++; }
+    catch(e){ msg(box,'warn',`No se pudo generar el croquis de ${v.vertice}: sin acceso a las teselas de mapa.`); }
+  }
+  return n;
+}
+async function pdf(all){
+  const box = $('pdfMsgs'); box.innerHTML=''; const list = all ? S.V : [S.V[S.sel]];
+  const bad = list.filter(v=>compute(v).level==='bad'); if(bad.length) msg(box,'warn',`${bad.length} vértice(s) con datos incompletos: ${bad.map(v=>v.vertice||'(sin nombre)').slice(0,8).join(', ')}. Se incluyen igualmente.`);
+  $('bPdfAll').disabled = $('bPdfOne').disabled = true; msg(box,'info','Generando…');
+  try{
+    const n = await ensureCroquis(list, box); if(n){ renderList(); if(S.sel>=0) showImgs(); }
+    const doc = await buildPdf(list);
+    const name = all ? `monografias_${safe($('pProj').value||'proyecto')}.pdf` : `monografia_${safe(list[0].vertice)}.pdf`;
+    download(doc.output('blob'), name);
+    box.lastChild.remove(); msg(box,'ok',`PDF generado: ${name} · ${list.length} hoja(s).`);
+  }catch(e){ box.lastChild?.remove(); msg(box,'bad', e.message||String(e)); }
+  finally{ renderList(); }
+}
+
+/* ---------- Guardar / abrir proyecto ---------- */
+function saveProject(){
+  const P = proj(); const data = {app:'GET-monografias', v:1, proyecto:P, vertices:S.V};
+  download(new Blob([JSON.stringify(data)],{type:'application/json'}), `proyecto_monografias_${safe(P.proj||'sin_nombre')}.json`);
+}
+async function openProject(file){
+  const box=$('loadMsgs'); box.innerHTML='';
+  try{ const d = JSON.parse(await file.text()); if(d.app!=='GET-monografias') throw new Error('El archivo no es un proyecto del Generador de Monografías.');
+    const P=d.proyecto||{}; $('pTitle').value=P.title||''; $('pEnt').value=P.ent||''; $('pProj').value=P.proj||''; $('pPage').value=P.page||'a4'; $('pColor').value=P.color||'#D9D9D9';
+    $('pElabN').value=P.elabN||''; $('pElabC').value=P.elabC||''; $('pSupN').value=P.supN||''; $('pSupC').value=P.supC||''; $('pFoot').checked=P.foot!==false; setLogo(P.logo||null);
+    S.V = (d.vertices||[]).map(v=>Object.assign(blank(), v)); S.sel = S.V.length?0:-1; renderList(); if(S.sel>=0) edit(0); else $('editor').hidden=true;
+    msg(box,'ok',`Proyecto abierto: ${S.V.length} vértice(s).`);
+  }catch(e){ msg(box,'bad', e.message||'No se pudo leer el proyecto.'); }
+}
+function setLogo(d){ S.logo=d; $('logoPrev').hidden=!d; $('bLogoDel').hidden=!d; $('logoNone').hidden=!!d; if(d) $('logoPrev').src=d; }
+
+/* ---------- Eventos ---------- */
+(function init(){
+  renderList();
+  $('bTpl').addEventListener('click', ()=>download(b64ToBlob(TEMPLATE_B64,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),'plantilla_vertices_monografias.xlsx'));
+  $('bLoad').addEventListener('click', ()=>$('fLoad').click());
+  $('fLoad').addEventListener('change', e=>{ if(e.target.files[0]) loadTemplate(e.target.files[0]); e.target.value=''; });
+  $('bAdd').addEventListener('click', ()=>{ const v=blank(); v.vertice=`V-${String(S.V.length+1).padStart(2,'0')}`; S.V.push(v); edit(S.V.length-1); $('editor').scrollIntoView({behavior:'smooth'}); });
+  $('bSave').addEventListener('click', saveProject);
+  $('bOpen').addEventListener('click', ()=>$('fOpen').click());
+  $('fOpen').addEventListener('change', e=>{ if(e.target.files[0]) openProject(e.target.files[0]); e.target.value=''; });
+  $('tblV').addEventListener('click', e=>{ const tr=e.target.closest('tr[data-i]'); if(tr) edit(+tr.dataset.i); });
+  document.querySelectorAll('#editor [data-k]').forEach(el=>el.addEventListener('input', ()=>{
+    if(S.sel<0) return; const k=el.dataset.k; S.V[S.sel][k]=el.value;
+    if(k==='zona_utm') document.querySelectorAll('#editor [data-k="zona_utm"]').forEach(o=>{ if(o!==el) o.value=el.value; });
+    if(k==='pais') setDivs(); refreshCalc(); renderList(); }));
+  $('v_tipo_entrada').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
+    const v=S.V[S.sel], r=compute(v);
+    // al cambiar el tipo de entrada se trasladan las coordenadas ya calculadas
+    if(r.ok){ if(b.dataset.v==='UTM'){ v.este=r.E.toFixed(3); v.norte=r.N.toFixed(3); v.zona_utm=r.zone; } else { v.latitud=r.lat.toFixed(9); v.longitud=r.lon.toFixed(9); } }
+    v.tipo_entrada=b.dataset.v; edit(S.sel); });
+  $('pLogo').addEventListener('change', async e=>{ const f=e.target.files[0]; if(!f) return; try{ setLogo(await fileToImage(f, 700, /png/i.test(f.type))); }catch(err){ alert(err.message); } e.target.value=''; });
+  $('bLogoDel').addEventListener('click', ()=>setLogo(null));
+  $('bFoto').addEventListener('click', ()=>$('fFoto').click());
+  $('fFoto').addEventListener('change', async e=>{ const f=e.target.files[0]; if(!f||S.sel<0) return; try{ S.V[S.sel].foto = await fileToImage(f, 1600, false); showImgs(); refreshCalc(); renderList(); }catch(err){ msg($('vMsgs'),'bad',err.message); } e.target.value=''; });
+  $('bFotoDel').addEventListener('click', ()=>{ if(S.sel<0) return; S.V[S.sel].foto=null; showImgs(); refreshCalc(); renderList(); });
+  $('bCroqUp').addEventListener('click', ()=>$('fCroq').click());
+  $('fCroq').addEventListener('change', async e=>{ const f=e.target.files[0]; if(!f||S.sel<0) return; try{ const v=S.V[S.sel]; v.croquis = await fileToImage(f, 1600, false); v.croqBase=null; v.croqMeta=null; v.croqKey='custom'; showImgs(); refreshCalc(); renderList(); }catch(err){ msg($('vMsgs'),'bad',err.message); } e.target.value=''; });
+  $('cZoom').addEventListener('change', e=>{ if(S.sel>=0) S.V[S.sel].zoom=+e.target.value; });
+  $('bCroq').addEventListener('click', async ()=>{
+    const v=S.V[S.sel], r=compute(v); if(!r.ok){ $('croqNote').textContent='Complete coordenadas válidas antes de generar el croquis.'; return; }
+    if(!inCountry(v.pais, r.lat, r.lon)){ $('croqNote').textContent=`El vértice queda fuera de ${v.pais} (${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}). Corrija las coordenadas antes de generar el croquis.`; return; }
+    v.zoom = +$('cZoom').value; $('bCroq').disabled=true; $('croqNote').textContent='Descargando imagen…';
+    try{ const out = await makeCroquis(v, r, v.zoom); v.croqBase=out.base; v.croqMeta=out.meta; v.croquis=await composeCroquis(v, 4/3); v.croqKey=`${r.lat.toFixed(7)},${r.lon.toFixed(7)},${v.vertice}`; showImgs(); renderList();
+      $('croqNote').textContent = (out.used==='esri' ? 'Croquis generado con Esri World Imagery y capas de referencia' : 'Esri no tiene imagen en este sitio: croquis generado con OpenStreetMap') + (out.z!==v.zoom ? ` (zoom ${out.z}: no había imagen al zoom ${v.zoom}).` : '.'); }
+    catch(e){ $('croqNote').textContent='No se pudieron descargar las teselas de mapa. Revise la conexión o suba un croquis propio.'; }
+    finally{ $('bCroq').disabled=false; }
+  });
+  $('bDel').addEventListener('click', ()=>{ if(S.sel<0) return; if(!confirm(`¿Eliminar el vértice ${S.V[S.sel].vertice}?`)) return; S.V.splice(S.sel,1); S.sel = S.V.length ? Math.min(S.sel, S.V.length-1) : -1; if(S.sel>=0) edit(S.sel); else { $('editor').hidden=true; renderList(); } });
+  $('bPdfOne').addEventListener('click', ()=>pdf(false));
+  $('bPdfAll').addEventListener('click', ()=>pdf(true));
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

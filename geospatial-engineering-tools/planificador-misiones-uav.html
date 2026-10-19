@@ -1,0 +1,1460 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Planificador de Misiones UAV</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* required styles */
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+/* Prevents IE11 from highlighting tiles in blue */
+.leaflet-tile::selection {
+	background: transparent;
+}
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+/* hack that prevents hw layers "stretching" when loading new tiles */
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.leaflet-container img.leaflet-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+}
+
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	/* Fallback for FF which doesn't support pinch-zoom */
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+
+.leaflet-pane         { z-index: 400; }
+
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: url(#default#VML);
+	display: inline-block;
+	position: absolute;
+	}
+
+
+/* control positioning */
+
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+
+
+/* zoom and fade animations */
+
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+
+
+/* cursors */
+
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+
+/* marker & overlays interactivity */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+
+/* general typography */
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+
+/* general toolbar styles */
+
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+
+
+/* layers control */
+
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: none;
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: none;
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+.leaflet-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: none;
+	}
+
+
+/* attribution and scale controls */
+
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+
+/* popup */
+
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+
+
+/* div icon */
+
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+
+/* Tooltip */
+/* Base styles for the element that has a tooltip */
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+
+</style>
+<style>
+/* Layout: instrument panel (controls) on the left, map + results on the right; stacks on phones */
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --area:#145487; --areafill:rgba(20,84,135,.14);
+  --grid:#DBE3EC; --ok:#2E7A4D; --warn:#B4600F; --bad:#B42318; --warnbg:#FDF1E7; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --area:#4F8FC7; --areafill:rgba(79,143,199,.18);
+  --grid:#1C3047; --ok:#5DBB86; --warn:#F0A04B; --bad:#F2796B; --warnbg:#2A1E12; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --area:#4F8FC7; --areafill:rgba(79,143,199,.18);
+  --grid:#1C3047; --ok:#5DBB86; --warn:#F0A04B; --bad:#F2796B; --warnbg:#2A1E12; --badbg:#2D1816; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 28px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-disp);font-weight:800;font-size:28px;letter-spacing:.04em;color:var(--brand);margin:0;line-height:1;text-wrap:balance;text-transform:uppercase}
+h1 .u{color:var(--accent)}
+.sub{color:var(--muted);margin:4px 0 0;font-size:13px}
+.by{font:500 12px var(--f-mono);color:var(--ink);margin-top:6px;letter-spacing:.02em}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 13px var(--f-body);padding:7px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink)}
+.grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.ctrl{display:flex;flex-direction:column}
+.sec{padding:14px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.sec:first-child{border-top:0}
+.lbl{font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--brand)}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.modes button{font:700 13px var(--f-disp);letter-spacing:.06em;text-transform:uppercase;padding:10px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--muted);cursor:pointer}
+.modes button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f label{font-size:12px;color:var(--muted)}
+.f .u{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+input[type=number],select,textarea{width:100%;font:500 14px var(--f-mono);color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:5px;padding:7px 8px;min-width:0}
+select{font-family:var(--f-body)}
+optgroup{font-style:normal;font-weight:600}
+input:focus-visible,select:focus-visible,button:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+.btn{font:600 13px var(--f-body);padding:7px 11px;border-radius:5px;border:1px solid var(--line);background:var(--field);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.btn.wx{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.wx[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px}
+.tag{display:inline-block;font:600 10.5px var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.tag.mech{color:var(--ok);border-color:var(--ok)}
+.tag.roll{color:var(--warn);border-color:var(--warn)}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+details.specs summary,details.form summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--brand);list-style:none}
+details.specs summary::before,details.form summary::before{content:"+ ";font-family:var(--f-mono)}
+details[open].specs summary::before,details[open].form summary::before{content:"– "}
+.specbox{display:flex;flex-direction:column;gap:8px}
+.note{font-size:12px;color:var(--muted)}
+.hint{font-size:12px;color:var(--accent);font-weight:500}
+.main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.res{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:640px){.res{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.m{padding:12px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.m .k{font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.m .v{font:600 22px var(--f-disp);letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m .v small{font:500 12px var(--f-mono);color:var(--muted);margin-left:3px}
+.m.hl .v{color:var(--accent)}
+.warns{display:flex;flex-direction:column;gap:6px;padding:12px 14px}
+.w{font-size:13px;padding:7px 10px;border-radius:5px;border-left:3px solid var(--warn);background:var(--warnbg)}
+.w.bad{border-left-color:var(--bad);background:var(--badbg)}
+.w.ok{border-left-color:var(--ok);background:var(--field)}
+.planhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.planhead .t{font:700 14px var(--f-disp);text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;align-items:center}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px}
+#map{height:540px;width:100%;background:var(--field);z-index:0}
+@media (max-width:640px){#map{height:420px}}
+#map.drawing{cursor:crosshair}
+.leaflet-container{font-family:var(--f-body)}
+.leaflet-control-scale-line{background:var(--panel);color:var(--ink);border-color:var(--ink);font-family:var(--f-mono)}
+.leaflet-bar a{background:var(--panel);color:var(--ink);border-bottom-color:var(--line)}
+.leaflet-control-attribution{background:rgba(255,255,255,.75);color:#333;font-size:10px}
+.lf-area{stroke:var(--area);fill:var(--areafill);stroke-width:2.2}
+.lf-path{stroke:var(--accent);fill:none;stroke-width:2}
+.lf-path2{stroke:var(--accent);fill:none;stroke-width:1.4;stroke-dasharray:6 5;opacity:.75}
+.lf-vtx{stroke:var(--area);fill:var(--panel);stroke-width:2}
+.lf-start{stroke:var(--panel);fill:var(--accent);stroke-width:2}
+.lf-draw{stroke:var(--area);fill:var(--areafill);stroke-width:2;stroke-dasharray:6 4}
+.sat .lf-path{stroke:#ED6D15}.sat .lf-area{stroke:#FFFFFF;fill:rgba(255,255,255,.12)}.sat .lf-vtx{stroke:#FFFFFF;fill:#145487}
+.exp{padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line)}
+textarea{font-size:12px;height:150px;resize:vertical}
+.form .fx{font-family:var(--f-mono);font-size:12.5px;background:var(--field);border-radius:5px;padding:8px 10px;overflow-x:auto;white-space:nowrap}
+.form .fxs{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+footer{color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+footer b{color:var(--brand);font-weight:600}
+a.li{color:var(--brand);font-weight:600;text-decoration:none;border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+.legal{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:28px;padding:20px 22px}
+@media (max-width:900px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp);letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin:0 0 10px}
+.legal p{margin:0 0 9px;font-size:12.5px;color:var(--muted);max-width:75ch}
+.srcs{margin:0;padding:0;list-style:none;columns:2 220px;column-gap:24px;font-size:12.5px}
+.srcs li{break-inside:avoid;margin-bottom:5px}
+.srcs li{color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.srcs a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-top:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span class="u">UAV</span> <span data-t="title">Planificador de misiones</span></h1>
+      <p class="sub" data-t="subtitle">Fotogrametría y LiDAR · altura, GSD, fotos, densidad, tiempo y baterías</p>
+      <div class="by"><span data-t="by">Elaborado por Ing. Geodesta Mario Forgione L.</span> · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+    </div>
+    <div class="seg" role="group" aria-label="Idioma / Language">
+      <button id="lang-es" aria-pressed="true">ES</button><button id="lang-en" aria-pressed="false">EN</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel ctrl">
+      <div class="sec">
+        <div class="modes" role="group">
+          <button id="mode-photo" aria-pressed="true" data-t="photo">Fotogrametría</button>
+          <button id="mode-lidar" aria-pressed="false">LiDAR</button>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="lbl" data-t="secArea">Área de interés</div>
+        <div class="btns">
+          <button class="btn pri" id="btn-import" data-t="importKml">Cargar KML / KMZ</button>
+          <input type="file" id="file" accept=".kml,.kmz" hidden>
+          <button class="btn" id="btn-draw" data-t="draw">Dibujar</button>
+          <button class="btn" id="btn-sample" data-t="sample">Ejemplo</button>
+        </div>
+        <div class="hint" id="draw-hint" hidden data-t="drawHint">Haga clic en el mapa para agregar vértices y pulse «Terminar» para cerrar el polígono.</div>
+        <div class="note" id="area-src"></div>
+      </div>
+
+      <div class="sec">
+        <div class="lbl" data-t="secEquip">Equipo</div>
+        <div class="f"><label for="drone" data-t="drone">Aeronave</label><select id="drone"></select></div>
+        <div class="f"><label for="sensor" id="sensor-lbl" data-t="camera">Cámara</label><select id="sensor"></select></div>
+        <div class="f" id="l3-box" hidden><label for="l-mode" data-t="lMode">Frecuencia de pulso (L3)</label>
+          <select id="l-mode"><option value="100">100 kHz · &lt; 500 m</option><option value="350" selected>350 kHz · &lt; 300 m</option><option value="1000">1000 kHz · &lt; 100 m</option><option value="2000">2000 kHz · &lt; 50 m</option></select></div>
+        <div class="tags" id="tags"></div>
+        <details class="specs" id="specs">
+          <summary data-t="specs">Especificaciones técnicas (editables)</summary>
+          <div class="specbox" style="margin-top:10px">
+            <div class="row3">
+              <div class="f"><label for="s-end" data-t="sEnd">Autonomía útil</label><input type="number" id="s-end" step="1"><span class="u">min</span></div>
+              <div class="f"><label for="s-vmin" data-t="sVmin">Vel. mín.</label><input type="number" id="s-vmin" step="0.5"><span class="u">m/s</span></div>
+              <div class="f"><label for="s-vmax" data-t="sVmax">Vel. máx.</label><input type="number" id="s-vmax" step="0.5"><span class="u">m/s</span></div>
+            </div>
+            <div class="row">
+              <div class="f"><label for="s-turn" data-t="sTurn">Tiempo por giro</label><input type="number" id="s-turn" step="1"><span class="u">s</span></div>
+              <div class="f"><label for="s-tol" data-t="sTol">Despegue + aterrizaje</label><input type="number" id="s-tol" step="0.5"><span class="u">min / vuelo</span></div>
+            </div>
+            <div id="specs-cam" class="specbox">
+              <div class="row">
+                <div class="f"><label for="c-sw" data-t="cSw">Ancho sensor</label><input type="number" id="c-sw" step="0.1"><span class="u">mm</span></div>
+                <div class="f"><label for="c-sh" data-t="cSh">Alto sensor</label><input type="number" id="c-sh" step="0.1"><span class="u">mm</span></div>
+              </div>
+              <div class="row3">
+                <div class="f"><label for="c-iw" data-t="cIw">Ancho imagen</label><input type="number" id="c-iw" step="1"><span class="u">px</span></div>
+                <div class="f"><label for="c-ih" data-t="cIh">Alto imagen</label><input type="number" id="c-ih" step="1"><span class="u">px</span></div>
+                <div class="f"><label for="c-f" data-t="cF">Focal real</label><input type="number" id="c-f" step="0.01"><span class="u">mm</span></div>
+              </div>
+              <div class="row3">
+                <div class="f"><label for="c-trig" data-t="cTrig">Intervalo mín.</label><input type="number" id="c-trig" step="0.1"><span class="u">s</span></div>
+                <div class="f"><label for="c-mb" data-t="cMb">Tamaño imagen</label><input type="number" id="c-mb" step="1"><span class="u">MB</span></div>
+                <div class="f"><label for="c-shut" data-t="cShut">Obturador</label><select id="c-shut"><option value="mech" data-t="mech">Mecánico / global</option><option value="roll" data-t="roll">Rolling</option></select></div>
+              </div>
+            </div>
+            <div id="specs-lidar" class="specbox" hidden>
+              <div class="row">
+                <div class="f"><label for="l-fov" data-t="lFov">FOV transversal útil</label><input type="number" id="l-fov" step="1"><span class="u">°</span></div>
+                <div class="f"><label for="l-prr" data-t="lPrr">Tasa de pulsos</label><input type="number" id="l-prr" step="1000"><span class="u">pts/s</span></div>
+              </div>
+              <div class="row">
+                <div class="f"><label for="l-amin" data-t="lAmin">Altura recomendada mín.</label><input type="number" id="l-amin" step="5"><span class="u">m AGL</span></div>
+                <div class="f"><label for="l-amax" data-t="lAmax">Altura recomendada máx.</label><input type="number" id="l-amax" step="5"><span class="u">m AGL</span></div>
+              </div>
+            </div>
+            <p class="note" id="spec-note" data-t="specNote">Valores de referencia de fichas técnicas públicas. La autonomía útil descuenta la carga útil y condiciones típicas; ajústela a su experiencia en campo.</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="sec">
+        <div class="lbl" data-t="secParams">Parámetros de vuelo</div>
+        <div id="p-photo" class="specbox">
+          <div class="row">
+            <div class="f"><label for="p-gsd">GSD</label><input type="number" id="p-gsd" step="0.1"><span class="u">cm/px</span></div>
+            <div class="f"><label for="p-alt" data-t="alt">Altura de vuelo</label><input type="number" id="p-alt" step="1"><span class="u">m AGL</span></div>
+          </div>
+          <div class="row">
+            <div class="f"><label for="p-front" data-t="front">Traslape frontal</label><input type="number" id="p-front" step="1" min="0" max="95"><span class="u">%</span></div>
+            <div class="f"><label for="p-side" data-t="side">Traslape lateral</label><input type="number" id="p-side" step="1" min="0" max="95"><span class="u">%</span></div>
+          </div>
+          <div class="row">
+            <div class="f"><label for="p-shutter" data-t="shutter">Obturación 1/x</label><input type="number" id="p-shutter" step="100"><span class="u">s⁻¹</span></div>
+            <div class="f"><label for="p-orient" data-t="orient">Lado largo de la imagen</label>
+              <select id="p-orient"><option value="cross" data-t="oCross">Transversal al vuelo</option><option value="along" data-t="oAlong">A lo largo del vuelo</option></select></div>
+          </div>
+          <label class="chk"><input type="checkbox" id="p-cross"> <span data-t="crossgrid">Doble malla (vuelo cruzado para 3D)</span></label>
+          <label class="chk" id="rs-box"><input type="checkbox" id="p-rs" checked> <span data-t="rsLimit">Limitar velocidad por rolling shutter</span></label>
+          <div class="row" id="rs-v-box"><div class="f"><label for="p-rsv" data-t="rsV">Vel. máx. con rolling shutter</label><input type="number" id="p-rsv" step="0.5"><span class="u">m/s</span></div></div>
+        </div>
+        <div id="p-lidar" class="specbox" hidden>
+          <div class="row">
+            <div class="f"><label for="l-alt" data-t="alt">Altura de vuelo</label><input type="number" id="l-alt" step="5"><span class="u">m AGL</span></div>
+            <div class="f"><label for="l-ov" data-t="lOv">Traslape entre franjas</label><input type="number" id="l-ov" step="5" min="0" max="90"><span class="u">%</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="f"><label for="p-speed" data-t="speed">Velocidad deseada</label><input type="number" id="p-speed" step="0.5"><span class="u">m/s</span></div>
+          <div class="f"><label for="p-res" data-t="reserve">Reserva de batería</label><input type="number" id="p-res" step="5" min="0" max="60"><span class="u">%</span></div>
+        </div>
+        <div class="row" style="align-items:end">
+          <div class="f"><label for="p-head" data-t="heading">Rumbo de las líneas</label><input type="number" id="p-head" step="1" min="0" max="179"><span class="u" data-t="fromNorth">° desde el norte</span></div>
+          <div class="f"><button class="btn" id="btn-opt" data-t="optimize">Optimizar rumbo</button><span class="u">&nbsp;</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="panel">
+        <div class="res" id="res"></div>
+        <div class="warns" id="warns"></div>
+      </div>
+
+      <div class="panel">
+        <div class="planhead">
+          <div class="t" data-t="plan">Plano de la misión</div>
+          <div class="legend">
+            <span><i style="background:var(--area)"></i><span data-t="lgArea">Área</span></span>
+            <span><i style="background:var(--accent)"></i><span data-t="lgPath">Líneas de vuelo</span></span>
+          </div>
+          <div class="btns">
+            <div class="seg" id="base-seg" role="group" aria-label="Basemap" hidden>
+              <button id="b-sat" aria-pressed="true" data-t="bSat">Satélite</button><button id="b-osm" aria-pressed="false">OSM</button><button id="b-none" aria-pressed="false" data-t="bNone">Sin mapa</button>
+            </div>
+            <button class="btn" id="btn-finish" hidden data-t="finish">Terminar</button>
+            <button class="btn" id="btn-cancel" hidden data-t="cancel">Cancelar</button>
+          </div>
+        </div>
+        <div id="map" role="application" aria-label="Mission map"></div>
+        <div class="exp">
+          <div class="btns">
+            <button class="btn pri" id="btn-kml" data-t="dlKml">Descargar KML</button>
+            <button class="btn" id="btn-kmz" data-t="dlKmz" hidden>Descargar KMZ</button>
+            <button class="btn" id="btn-csv" data-t="dlCsv">Descargar resumen (CSV)</button>
+            <a class="btn wx" id="btn-wx" href="#" target="_blank" rel="noopener"><span data-t="wxBtn">Evaluar condiciones de esta misión</span> ↗</a>
+          </div>
+          <div class="note" id="wx-note"></div>
+          <div class="note" id="exp-note"></div>
+          <div id="exp-box" hidden><textarea id="exp-text" readonly aria-label="Export"></textarea></div>
+        </div>
+      </div>
+
+      <div class="panel" style="padding:14px 16px">
+        <details class="form" id="formulas">
+          <summary data-t="formulas">Cómo se calcula (fórmulas con los valores actuales)</summary>
+          <div class="fxs" id="fx"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <section class="panel legal" aria-labelledby="disc-h">
+    <div class="legal-col">
+      <h2 id="disc-h" data-t="discH">Descargo de responsabilidad</h2>
+      <div id="disc"></div>
+    </div>
+    <div class="legal-col">
+      <h2 data-t="srcH">Fuentes consultadas</h2>
+      <ul class="srcs" id="srcs"></ul>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+    <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const STANDALONE=/*STANDALONE*/true;
+(function(){
+const $=s=>document.querySelector(s);
+
+/* ---------- Catálogo (valores de referencia, editables) ---------- */
+const CAMS={
+  p1_24:{n:'Zenmuse P1 · 24 mm',sw:35.9,sh:24.0,iw:8192,ih:5460,f:24,trig:0.7,mb:25,sh_:'mech'},
+  p1_35:{n:'Zenmuse P1 · 35 mm',sw:35.9,sh:24.0,iw:8192,ih:5460,f:35,trig:0.7,mb:25,sh_:'mech'},
+  p1_50:{n:'Zenmuse P1 · 50 mm',sw:35.9,sh:24.0,iw:8192,ih:5460,f:50,trig:0.7,mb:25,sh_:'mech'},
+  m4e:{n:'Matrice 4E · gran angular 4/3" 20 MP',sw:17.3,sh:13.0,iw:5280,ih:3956,f:12.29,trig:0.5,mb:12,sh_:'mech'},
+  m4t:{n:'Matrice 4T · gran angular 1/1,3" 48 MP',sw:9.6,sh:7.2,iw:8064,ih:6048,f:6.72,trig:1.0,mb:16,sh_:'roll'},
+  m30t:{n:'Matrice 30T · gran angular 1/2" 12 MP',sw:6.4,sh:4.8,iw:4000,ih:3000,f:4.5,trig:1.0,mb:6,sh_:'roll'},
+  m3e:{n:'Mavic 3E · 4/3" 20 MP',sw:17.3,sh:13.0,iw:5280,ih:3956,f:12.29,trig:0.7,mb:12,sh_:'mech'},
+  m3m:{n:'Mavic 3M · RGB 4/3" 20 MP',sw:17.3,sh:13.0,iw:5280,ih:3956,f:12.29,trig:0.7,mb:12,sh_:'mech'},
+  p4r:{n:'Phantom 4 RTK · 1" 20 MP',sw:13.2,sh:8.8,iw:5472,ih:3648,f:8.8,trig:2.0,mb:8,sh_:'mech'},
+  w_s61:{n:'SURVEY61 · 61 MP FF · 35 mm',sw:35.7,sh:23.8,iw:9504,ih:6336,f:35,trig:1.0,mb:30,sh_:'mech'},
+  w_m61:{n:'MAP61 · 61 MP FF (nadir)',sw:35.7,sh:23.8,iw:9504,ih:6336,f:16.7,trig:1.0,mb:30,sh_:'mech'},
+  w_s24:{n:'SURVEY24 · 24 MP APS-C',sw:23.5,sh:15.6,iw:6000,ih:4000,f:19.6,trig:1.0,mb:12,sh_:'mech'},
+  w_ins:{n:'INSPECT · 85 mm',sw:35.7,sh:23.8,iw:9504,ih:6336,f:85,trig:1.0,mb:30,sh_:'mech'},
+  w_rgb61:{n:'RGB61 · 61 MP FF',sw:35.7,sh:23.8,iw:9504,ih:6336,f:24.1,trig:1.0,mb:30,sh_:'mech'},
+  rx1r:{n:'Sony RX1R II · 42 MP · 35 mm',sw:35.8,sh:23.9,iw:7952,ih:5304,f:35,trig:1.0,mb:20,sh_:'mech'},
+  a6100:{n:'Sony a6100 · 24 MP · 20 mm',sw:23.5,sh:15.6,iw:6000,ih:4000,f:20,trig:1.0,mb:12,sh_:'mech'},
+  lr1:{n:'Sony ILX-LR1 · 61 MP · 24 mm',sw:35.7,sh:23.8,iw:9504,ih:6336,f:24,trig:1.0,mb:30,sh_:'mech'},
+  d2m:{n:'Oblique D2M · nadir 26 MP · 25 mm',sw:23.5,sh:15.6,iw:6252,ih:4168,f:25,trig:0.8,mb:15,sh_:'mech'},
+  soda:{n:'S.O.D.A. 3D · 1" 20 MP · global',sw:13.2,sh:8.8,iw:5472,ih:3648,f:10.6,trig:1.5,mb:9,sh_:'mech'},
+  evo2:{n:'EVO II Pro RTK V3 · 1" 20 MP',sw:13.2,sh:8.8,iw:5472,ih:3648,f:10.57,trig:2.0,mb:10,sh_:'roll'},
+  evomax:{n:'EVO Max 4T · gran angular 1/2" 48 MP',sw:6.4,sh:4.8,iw:8000,ih:6000,f:4.44,trig:1.0,mb:12,sh_:'roll'}
+};
+const LIDARS={
+  l2:{n:'Zenmuse L2',fov:70,prr:240000,amin:30,amax:150},
+  l3:{n:'Zenmuse L3 · 1535 nm',fov:80,prr:350000,amin:30,amax:300}
+};
+const L3MODES={100:500,350:300,1000:100,2000:50};
+const DRONES={
+  m400:{b:'DJI Enterprise',n:'DJI Matrice 400',type:'mr',end:45,vmin:1,vmax:15,turn:6,tol:2,cams:['p1_24','p1_35','p1_50'],lid:['l2','l3']},
+  m350:{b:'DJI Enterprise',n:'DJI Matrice 350 RTK',type:'mr',end:35,vmin:1,vmax:15,turn:6,tol:2,cams:['p1_24','p1_35','p1_50'],lid:['l2']},
+  m4e:{b:'DJI Enterprise',n:'DJI Matrice 4E',type:'mr',end:40,vmin:1,vmax:15,turn:5,tol:2,cams:['m4e'],lid:[]},
+  m4d:{b:'DJI Enterprise',n:'DJI Matrice 4D (Dock 3)',type:'mr',end:42,vmin:1,vmax:15,turn:5,tol:2,cams:['m4e'],lid:[]},
+  m4t:{b:'DJI Enterprise',n:'DJI Matrice 4T',type:'mr',end:40,vmin:1,vmax:15,turn:5,tol:2,cams:['m4t'],lid:[]},
+  m30t:{b:'DJI Enterprise',n:'DJI Matrice 30T',type:'mr',end:33,vmin:1,vmax:15,turn:5,tol:2,cams:['m30t'],lid:[]},
+  m3e:{b:'DJI Enterprise',n:'DJI Mavic 3 Enterprise (3E)',type:'mr',end:36,vmin:1,vmax:15,turn:5,tol:2,cams:['m3e'],lid:[]},
+  m3m:{b:'DJI Enterprise',n:'DJI Mavic 3 Multispectral (3M)',type:'mr',end:35,vmin:1,vmax:15,turn:5,tol:2,cams:['m3m'],lid:[]},
+  p4r:{b:'DJI Enterprise',n:'DJI Phantom 4 RTK',type:'mr',end:24,vmin:1,vmax:14,turn:5,tol:2,cams:['p4r'],lid:[]},
+  wray:{b:'Wingtra',n:'WingtraRAY (VTOL)',type:'fw',end:55,vmin:16,vmax:22,cruise:16,turn:20,tol:3,cams:['w_s61','w_m61','w_s24','w_ins'],lid:[]},
+  wone:{b:'Wingtra',n:'WingtraOne GEN II (VTOL)',type:'fw',end:55,vmin:16,vmax:16,cruise:16,turn:20,tol:3,cams:['w_rgb61','w_m61','rx1r','a6100'],lid:[]},
+  evo2:{b:'Autel',n:'Autel EVO II Pro RTK V3',type:'mr',end:32,vmin:1,vmax:15,turn:5,tol:2,cams:['evo2'],lid:[]},
+  evomax:{b:'Autel',n:'Autel EVO Max 4T V2',type:'mr',end:35,vmin:1,vmax:15,turn:5,tol:2,cams:['evomax'],lid:[]},
+  evomaxxe:{b:'Autel',n:'Autel EVO Max 4T XE',type:'mr',end:35,vmin:1,vmax:15,turn:5,tol:2,cams:['evomax'],lid:[]},
+  trinity:{b:'Otros',n:'Quantum-Systems Trinity Pro (VTOL)',type:'fw',end:50,vmin:17,vmax:17,cruise:17,turn:20,tol:3,cams:['lr1','d2m'],lid:[]},
+  ebee:{b:'Otros',n:'AgEagle eBee X',type:'fw',end:80,vmin:11,vmax:30,cruise:13,turn:20,tol:4,cams:['soda'],lid:[]},
+  custom:{b:'Otros',n:'Personalizado / Custom',type:'mr',end:30,vmin:1,vmax:15,turn:6,tol:2,cams:Object.keys(CAMS),lid:Object.keys(LIDARS)}
+};
+
+/* ---------- i18n ---------- */
+const T={
+es:{title:'Planificador de misiones',subtitle:'Fotogrametría y LiDAR · altura, GSD, fotos, densidad, tiempo y baterías',by:'Elaborado por Ing. Geodesta Mario Forgione L.',by2:'Elaborado por',photo:'Fotogrametría',
+secArea:'Área de interés',importKml:'Cargar KML / KMZ',draw:'Dibujar',sample:'Ejemplo',drawHint:'Haga clic en el mapa para agregar vértices y pulse «Terminar» para cerrar el polígono.',
+secEquip:'Equipo',drone:'Aeronave',camera:'Cámara',lidar:'Sensor LiDAR',lMode:'Frecuencia de pulso (L3)',specs:'Especificaciones técnicas (editables)',sEnd:'Autonomía útil',sVmin:'Vel. mín.',sVmax:'Vel. máx.',sTurn:'Tiempo por giro',sTol:'Despegue + aterrizaje',
+cSw:'Ancho sensor',cSh:'Alto sensor',cIw:'Ancho imagen',cIh:'Alto imagen',cF:'Focal real',cTrig:'Intervalo mín.',cMb:'Tamaño imagen',cShut:'Obturador',mech:'Mecánico / global',roll:'Rolling',
+lFov:'FOV transversal útil',lPrr:'Tasa de pulsos',lAmin:'Altura recomendada mín.',lAmax:'Altura recomendada máx.',
+specNote:'Valores de referencia de fichas técnicas públicas. La autonomía útil descuenta la carga útil y condiciones típicas; ajústela a su experiencia en campo.',
+secParams:'Parámetros de vuelo',alt:'Altura de vuelo',front:'Traslape frontal',side:'Traslape lateral',shutter:'Obturación 1/x',orient:'Lado largo de la imagen',oCross:'Transversal al vuelo',oAlong:'A lo largo del vuelo',
+crossgrid:'Doble malla (vuelo cruzado para 3D)',rsLimit:'Limitar velocidad por rolling shutter',rsV:'Vel. máx. con rolling shutter',lOv:'Traslape entre franjas',speed:'Velocidad deseada',reserve:'Reserva de batería',heading:'Rumbo de las líneas',fromNorth:'° desde el norte',optimize:'Optimizar rumbo',
+plan:'Plano de la misión',lgArea:'Área',lgPath:'Líneas de vuelo',finish:'Terminar',cancel:'Cancelar',bSat:'Satélite',bNone:'Sin mapa',
+dlKml:'Descargar KML',dlKmz:'Descargar KMZ',dlCsv:'Descargar resumen (CSV)',
+formulas:'Cómo se calcula (fórmulas con los valores actuales)',foot1:'Estimaciones de planificación: no sustituyen el software de vuelo del fabricante. Altura AGL sobre terreno supuesto plano.',
+rArea:'Área',rTime:'Tiempo de vuelo',rField:'Tiempo en campo',rBat:'Vuelos / baterías',rPhotos:'Fotos',rAlt:'Altura',rSpeed:'Velocidad efectiva',rVtrig:'Vel. máx. por disparo',rLines:'Líneas',rLen:'Recorrido',rInt:'Intervalo de disparo',rData:'Volumen de datos',
+rDens:'Densidad promedio',rDens1:'Densidad por pasada',rSwath:'Ancho de franja',rPts:'Pulsos estimados',rFoot:'Huella por foto',rSpacing:'Separación entre líneas',rPtSp:'Espaciado de puntos',rBlur:'Desplazamiento por movimiento',rLine:'Tiempo en líneas',
+srcSample:'Área de ejemplo (polígono ficticio de ~123 ha, Zulia). Cargue su KML/KMZ para trabajar con su proyecto.',srcKml:'Área cargada desde: ',srcDraw:'Área dibujada sobre el mapa.',
+wTrig:'La velocidad se redujo a {v} m/s porque la cámara no dispara más rápido que cada {t} s. Para volar más rápido: suba la altura o reduzca el traslape frontal.',
+wTrigFw:'Con {v} m/s el intervalo requerido ({i} s) es menor al mínimo de la cámara ({t} s). Suba la altura o reduzca el traslape frontal.',
+wSpeed:'La velocidad se limitó a {v} m/s (rango de la aeronave).',wBlur:'Desplazamiento por movimiento de {b} px: use una obturación más rápida o reduzca la velocidad (objetivo < 0,5 px).',
+wRs:'Cámara con obturador rolling: la velocidad se limitó a {v} m/s para reducir la distorsión. Active además la corrección de rolling shutter en el software de procesamiento.',
+wRsOff:'Cámara con obturador rolling a {v} m/s: espere distorsión geométrica. Active la corrección de rolling shutter en el procesamiento o reduzca la velocidad.',
+wInsp:'Aeronave orientada a inspección: la cámara gran angular sirve para mapeo de referencia, no para productos de precisión.',
+w120:'Altura mayor a 120 m AGL: verifique la autorización ante la autoridad aeronáutica (DGAC, INAC u otra).',wLalt:'Altura fuera del rango recomendado del sensor ({a}–{b} m).',
+wEnd:'La reserva y los tiempos de despegue no dejan autonomía útil: revise la autonomía o la reserva.',wFlights:'La misión requiere {n} vuelos: planifique los puntos de cambio de batería.',
+okAll:'Parámetros dentro de rangos habituales.',wNoArea:'Defina un área: cargue un KML/KMZ, dibújela o use el ejemplo.',wOv:'Traslapes por debajo de lo habitual para fotogrametría (frontal ≥ 70 %, lateral ≥ 60 %).',
+saved:'Archivo listo: {f}',declined:'Descarga cancelada.',dlFail:'La descarga no está disponible en esta vista: el contenido quedó abajo para copiarlo.',
+zipNote:'En esta vista la plataforma no admite la extensión .kml, por eso el KML se entrega dentro de un .zip (incluye también GeoJSON y el resumen CSV). Descomprímalo, o cambie la extensión .zip a .kmz para abrirlo directo en Google Earth.',
+noBase:'Mapa base satelital no disponible en esta vista publicada. Use la versión HTML independiente para trabajar sobre imagen satelital.',
+errKml:'No se encontró un polígono en el archivo. Verifique que contenga un Polygon o LinearRing.',errKmz:'No se pudo leer el KMZ.',
+fGsd:'GSD (tamaño de píxel en terreno)',fFoot:'Huella de la foto',fSp:'Separación entre líneas y base entre fotos',fV:'Velocidad e intervalo de disparo',fPh:'Número de fotos',fT:'Tiempo y baterías',
+fSw:'Ancho de franja LiDAR',fDen:'Densidad de puntos',fNote:'Proyección local equirectangular, adecuada para áreas de hasta decenas de km². Supone terreno plano: con relieve, el GSD y la densidad varían con la altura real sobre el terreno.',
+flights:'vuelos',min:'min',h:'h',area:'Área',path:'Ruta',discH:'Descargo de responsabilidad',srcH:'Fuentes consultadas',
+wxBtn:'Evaluar condiciones de esta misión',wxNote:'Abre Ventana de Vuelo con el centroide del área, la aeronave, la altura y la duración de esta misión.',
+wxNoCat:'Esta aeronave no está en el catálogo de Ventana de Vuelo: se abrirá con el centroide y la altura, y deberá elegir allí un equipo equivalente.',
+wxPub:'En esta vista publicada el enlace abre Ventana de Vuelo sin los datos de la misión. Use la versión alojada en HTTPS (ambos archivos en la misma carpeta) para pasarlos automáticamente.'},
+en:{title:'Mission planner',subtitle:'Photogrammetry and LiDAR · altitude, GSD, photos, density, flight time and batteries',by:'Prepared by Geodetic Engineer Mario Forgione L.',by2:'Prepared by',photo:'Photogrammetry',
+secArea:'Area of interest',importKml:'Load KML / KMZ',draw:'Draw',sample:'Sample',drawHint:'Click on the map to add vertices and press “Finish” to close the polygon.',
+secEquip:'Equipment',drone:'Aircraft',camera:'Camera',lidar:'LiDAR sensor',lMode:'Pulse frequency (L3)',specs:'Technical specifications (editable)',sEnd:'Usable endurance',sVmin:'Min. speed',sVmax:'Max. speed',sTurn:'Time per turn',sTol:'Take-off + landing',
+cSw:'Sensor width',cSh:'Sensor height',cIw:'Image width',cIh:'Image height',cF:'True focal length',cTrig:'Min. interval',cMb:'Image size',cShut:'Shutter',mech:'Mechanical / global',roll:'Rolling',
+lFov:'Usable cross-track FOV',lPrr:'Pulse rate',lAmin:'Recommended min. altitude',lAmax:'Recommended max. altitude',
+specNote:'Reference values from public datasheets. Usable endurance accounts for payload and typical conditions; adjust it to your field experience.',
+secParams:'Flight parameters',alt:'Flight altitude',front:'Front overlap',side:'Side overlap',shutter:'Shutter 1/x',orient:'Image long side',oCross:'Across track',oAlong:'Along track',
+crossgrid:'Double grid (cross flight for 3D)',rsLimit:'Limit speed for rolling shutter',rsV:'Max. speed with rolling shutter',lOv:'Swath overlap',speed:'Target speed',reserve:'Battery reserve',heading:'Line heading',fromNorth:'° from north',optimize:'Optimize heading',
+plan:'Mission plan',lgArea:'Area',lgPath:'Flight lines',finish:'Finish',cancel:'Cancel',bSat:'Satellite',bNone:'No map',
+dlKml:'Download KML',dlKmz:'Download KMZ',dlCsv:'Download summary (CSV)',
+formulas:'How it is calculated (formulas with current values)',foot1:'Planning estimates: they do not replace the manufacturer’s flight software. AGL altitude over assumed flat terrain.',
+rArea:'Area',rTime:'Flight time',rField:'Field time',rBat:'Flights / batteries',rPhotos:'Photos',rAlt:'Altitude',rSpeed:'Effective speed',rVtrig:'Max speed (trigger)',rLines:'Lines',rLen:'Path length',rInt:'Trigger interval',rData:'Data volume',
+rDens:'Average density',rDens1:'Density per pass',rSwath:'Swath width',rPts:'Estimated pulses',rFoot:'Photo footprint',rSpacing:'Line spacing',rPtSp:'Point spacing',rBlur:'Motion blur',rLine:'Time on lines',
+srcSample:'Sample area (fictitious ~123 ha polygon, Zulia). Load your KML/KMZ to work on your project.',srcKml:'Area loaded from: ',srcDraw:'Area drawn on the map.',
+wTrig:'Speed was reduced to {v} m/s because the camera cannot trigger faster than every {t} s. To fly faster, raise the altitude or lower the front overlap.',
+wTrigFw:'At {v} m/s the required interval ({i} s) is shorter than the camera minimum ({t} s). Raise the altitude or lower the front overlap.',
+wSpeed:'Speed was limited to {v} m/s (aircraft range).',wBlur:'Motion blur of {b} px: use a faster shutter or lower the speed (target < 0.5 px).',
+wRs:'Rolling-shutter camera: speed was limited to {v} m/s to reduce distortion. Also enable rolling-shutter correction in your processing software.',
+wRsOff:'Rolling-shutter camera at {v} m/s: expect geometric distortion. Enable rolling-shutter correction in processing or reduce speed.',
+wInsp:'Inspection-oriented aircraft: the wide camera is suitable for reference mapping, not precision deliverables.',
+w120:'Altitude above 120 m AGL: check authorization with the aviation authority.',wLalt:'Altitude outside the sensor’s recommended range ({a}–{b} m).',
+wEnd:'Reserve and take-off times leave no usable endurance: check endurance or reserve.',wFlights:'The mission needs {n} flights: plan the battery swap points.',
+okAll:'Parameters within usual ranges.',wNoArea:'Define an area: load a KML/KMZ, draw it, or use the sample.',wOv:'Overlaps below usual photogrammetry values (front ≥ 70 %, side ≥ 60 %).',
+saved:'File ready: {f}',declined:'Download cancelled.',dlFail:'Downloads are not available in this view: the content is shown below for copying.',
+zipNote:'This view does not allow the .kml extension, so the KML is delivered inside a .zip (with GeoJSON and the CSV summary). Unzip it, or rename .zip to .kmz to open it directly in Google Earth.',
+noBase:'Satellite basemap is not available in this published view. Use the standalone HTML version to work over satellite imagery.',
+errKml:'No polygon found in the file. Check that it contains a Polygon or LinearRing.',errKmz:'The KMZ could not be read.',
+fGsd:'GSD (ground sample distance)',fFoot:'Photo footprint',fSp:'Line spacing and photo base',fV:'Speed and trigger interval',fPh:'Number of photos',fT:'Time and batteries',
+fSw:'LiDAR swath width',fDen:'Point density',fNote:'Local equirectangular projection, adequate for areas up to tens of km². Assumes flat terrain: over relief, GSD and density change with the true height above ground.',
+flights:'flights',min:'min',h:'h',area:'Area',path:'Path',discH:'Disclaimer',srcH:'Sources consulted',
+wxBtn:'Check conditions for this mission',wxNote:'Opens Ventana de Vuelo with the area centroid, aircraft, altitude and duration of this mission.',
+wxNoCat:'This aircraft is not in the Ventana de Vuelo catalog: it will open with the centroid and altitude, and you will need to pick an equivalent aircraft there.',
+wxPub:'In this published view the link opens Ventana de Vuelo without the mission data. Use the version hosted over HTTPS (both files in the same folder) to pass it automatically.'}
+};
+let lang='es';
+const t=(k,v)=>{let s=(T[lang][k]??k);if(v)for(const x in v)s=s.replace('{'+x+'}',v[x]);return s;};
+const nf=(n,d=0)=>Number.isFinite(n)?n.toLocaleString(lang==='es'?'es-ES':'en-US',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+const dur=min=>{if(!Number.isFinite(min))return '—';const h=Math.floor(min/60),m=Math.round(min-h*60);return h?`${h} ${t('h')} ${String(m).padStart(2,'0')}`:`${m} ${t('min')}`;};
+
+/* ---------- Geometría ---------- */
+const R=6378137,K=Math.PI/180;
+let poly=[],origin={lat:10.62,lon:-71.75},srcType='sample',srcName='';
+const toXY=(p,o)=>[(p[1]-o.lon)*K*R*Math.cos(o.lat*K),(p[0]-o.lat)*K*R];
+const toLL=(x,y,o)=>[o.lat+y/(R*K),o.lon+x/(R*K*Math.cos(o.lat*K))];
+function setOrigin(){let a=0,b=0;poly.forEach(p=>{a+=p[0];b+=p[1]});origin={lat:a/poly.length,lon:b/poly.length};}
+function areaXY(P){let s=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];s+=a[0]*b[1]-b[0]*a[1];}return Math.abs(s)/2;}
+const rot=(p,a)=>[p[0]*Math.cos(a)-p[1]*Math.sin(a),p[0]*Math.sin(a)+p[1]*Math.cos(a)];
+function genLines(P,headDeg,spacing,ext){
+  const a=-(90-headDeg)*K,Q=P.map(p=>rot(p,a));
+  let ymin=Infinity,ymax=-Infinity;Q.forEach(p=>{ymin=Math.min(ymin,p[1]);ymax=Math.max(ymax,p[1])});
+  const span=ymax-ymin,n=Math.max(1,Math.ceil(span/spacing)+1),y0=(ymin+ymax)/2-(n-1)*spacing/2,eps=Math.min(0.01,span/1000);
+  const lines=[];let len=0;
+  for(let k=0;k<n;k++){
+    const y=y0+k*spacing,yc=Math.min(Math.max(y,ymin+eps),ymax-eps),xs=[];
+    for(let i=0;i<Q.length;i++){const p=Q[i],q=Q[(i+1)%Q.length];if((p[1]<=yc&&q[1]>yc)||(q[1]<=yc&&p[1]>yc))xs.push(p[0]+(yc-p[1])*(q[0]-p[0])/(q[1]-p[1]));}
+    if(xs.length<2)continue;
+    let x1=Math.min(...xs)-ext,x2=Math.max(...xs)+ext;if(lines.length%2===1)[x1,x2]=[x2,x1];
+    lines.push([[x1,y],[x2,y]]);len+=Math.abs(x2-x1);
+  }
+  const back=lines.map(l=>l.map(p=>rot(p,-a))),path=[];back.forEach(l=>path.push(l[0],l[1]));
+  return {lines:back,path,len,n:lines.length};
+}
+
+/* ---------- Estado / UI ---------- */
+let mode='photo';
+const num=id=>parseFloat($(id).value);
+function fillDrones(){
+  const sel=$('#drone'),cur=sel.value;sel.innerHTML='';const groups={};
+  for(const k in DRONES){const d=DRONES[k];if(mode==='lidar'&&!d.lid.length)continue;if(mode==='photo'&&!d.cams.length)continue;
+    if(!groups[d.b]){groups[d.b]=document.createElement('optgroup');groups[d.b].label=d.b;sel.appendChild(groups[d.b]);}
+    const o=document.createElement('option');o.value=k;o.textContent=d.n;groups[d.b].appendChild(o);}
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  loadDrone();
+}
+function loadDrone(){
+  const d=DRONES[$('#drone').value];
+  $('#s-end').value=d.end;$('#s-vmin').value=d.vmin;$('#s-vmax').value=d.vmax;$('#s-turn').value=d.turn;$('#s-tol').value=d.tol;
+  if(d.type==='fw')$('#p-speed').value=d.cruise||d.vmin;
+  fillSensors();
+}
+function fillSensors(){
+  const d=DRONES[$('#drone').value],sel=$('#sensor'),cur=sel.value;sel.innerHTML='';
+  const list=mode==='photo'?d.cams:d.lid,DB=mode==='photo'?CAMS:LIDARS;
+  list.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=DB[k].n;sel.appendChild(o)});
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  loadSensor();
+}
+function loadSensor(){
+  const k=$('#sensor').value;
+  if(mode==='photo'){const c=CAMS[k];$('#c-sw').value=c.sw;$('#c-sh').value=c.sh;$('#c-iw').value=c.iw;$('#c-ih').value=c.ih;$('#c-f').value=c.f;$('#c-trig').value=c.trig;$('#c-mb').value=c.mb;$('#c-shut').value=c.sh_;altFromGsd();$('#l3-box').hidden=true;}
+  else{const l=LIDARS[k];$('#l-fov').value=l.fov;$('#l-prr').value=l.prr;$('#l-amin').value=l.amin;$('#l-amax').value=l.amax;$('#l3-box').hidden=k!=='l3';if(k==='l3')applyL3();}
+  update();
+}
+function applyL3(){const khz=+$('#l-mode').value;$('#l-prr').value=khz*1000;$('#l-amax').value=L3MODES[khz];}
+function setMode(m){
+  mode=m;$('#mode-photo').setAttribute('aria-pressed',m==='photo');$('#mode-lidar').setAttribute('aria-pressed',m==='lidar');
+  $('#p-photo').hidden=m!=='photo';$('#p-lidar').hidden=m!=='lidar';$('#specs-cam').hidden=m!=='photo';$('#specs-lidar').hidden=m!=='lidar';
+  $('#sensor-lbl').textContent=t(m==='photo'?'camera':'lidar');
+  fillDrones();
+}
+const gsdPerAlt=()=>num('#c-sw')/(num('#c-f')*num('#c-iw'));
+function altFromGsd(){const g=num('#p-gsd')/100;if(g>0)$('#p-alt').value=(g/gsdPerAlt()).toFixed(1);}
+function gsdFromAlt(){const h=num('#p-alt');if(h>0)$('#p-gsd').value=(h*gsdPerAlt()*100).toFixed(2);}
+
+/* ---------- Cálculo ---------- */
+function compute(head){
+  const out={warn:[],bad:[]};
+  if(poly.length<3){out.none=true;return out;}
+  const P=poly.map(p=>toXY(p,origin));out.P=P;out.area=areaXY(P);
+  const dk=$('#drone').value,dr=DRONES[dk],type=dr.type,vmin=num('#s-vmin'),vmax=num('#s-vmax'),vUser=num('#p-speed');
+  const turn=num('#s-turn'),tol=num('#s-tol'),endu=num('#s-end'),res=num('#p-res')/100;
+  let v=Math.min(Math.max(vUser,vmin),vmax);if(v!==vUser)out.warn.push(t('wSpeed',{v:nf(v,1)}));
+  const passes=[];
+  if(mode==='photo'){
+    const sw=num('#c-sw'),f=num('#c-f'),iw=num('#c-iw'),ih=num('#c-ih'),trig=num('#c-trig'),mb=num('#c-mb'),shut=$('#c-shut').value;
+    const H=num('#p-alt'),fo=num('#p-front')/100,so=num('#p-side')/100;
+    const gsd=H*sw/(f*iw),cross=$('#p-orient').value==='cross',W=gsd*(cross?iw:ih),L=gsd*(cross?ih:iw);
+    const spacing=W*(1-so),base=L*(1-fo),vTrig=base/trig;
+    if(shut==='roll'&&type==='mr'){const rv=num('#p-rsv');if($('#p-rs').checked){if(v>rv){v=rv;out.warn.push(t('wRs',{v:nf(v,1)}));}}else if(v>rv)out.warn.push(t('wRsOff',{v:nf(v,1)}));}
+    if(type==='mr'){if(v>vTrig){v=vTrig;out.warn.push(t('wTrig',{v:nf(v,1),t:nf(trig,1)}));}}
+    else if(v>vTrig)out.bad.push(t('wTrigFw',{v:nf(v,1),i:nf(base/v,2),t:nf(trig,1)}));
+    const blur=v*(1/num('#p-shutter'))/gsd;if(blur>0.5)out.warn.push(t('wBlur',{b:nf(blur,2)}));
+    if(fo<0.7||so<0.6)out.warn.push(t('wOv'));
+    if(dk==='m4t'||dk==='m30t'||dk==='evomax'||dk==='evomaxxe')out.warn.push(t('wInsp'));
+    const heads=[head];if($('#p-cross').checked)heads.push((head+90)%180);
+    let photos=0;heads.forEach(h=>{const g=genLines(P,h,spacing,base);passes.push(g);g.lines.forEach(l=>{photos+=Math.ceil(Math.hypot(l[1][0]-l[0][0],l[1][1]-l[0][1])/base)+1;});});
+    Object.assign(out,{gsd,W,L,spacing,base,vTrig,blur,photos,H,mb,data:photos*mb,trig,sw,f,iw,ih,fo,so,interval:base/v,shut});
+    if(H>120)out.warn.push(t('w120'));
+  }else{
+    const H=num('#l-alt'),ov=num('#l-ov')/100,fov=num('#l-fov'),prr=num('#l-prr');
+    const swath=2*H*Math.tan(fov/2*K),spacing=swath*(1-ov);
+    passes.push(genLines(P,head,spacing,20));
+    Object.assign(out,{H,swath,spacing,dens1:prr/(v*swath),dens:prr/(v*spacing),fov,prr,ov});
+    out.ptsp=1/Math.sqrt(out.dens);
+    if(H<num('#l-amin')||H>num('#l-amax'))out.warn.push(t('wLalt',{a:num('#l-amin'),b:num('#l-amax')}));
+    if(H>120)out.warn.push(t('w120'));
+  }
+  let len=0,n=0,workS=0;
+  passes.forEach(g=>{len+=g.len;n+=g.n;workS+=g.len/v+Math.max(0,g.n-1)*(out.spacing/v+turn);});
+  if(passes.length>1)workS+=turn;
+  const lineS=len/v;
+  if(mode==='lidar'){out.pts=out.prr*lineS;out.data=out.pts*34/1e6;}
+  const work=workS/60,usable=endu*(1-res)-tol;
+  let flights=NaN,air=NaN,field=NaN;
+  if(usable<=0)out.bad.push(t('wEnd'));
+  else{flights=Math.max(1,Math.ceil(work/usable));air=work+flights*tol;field=air+(flights-1)*5;if(flights>1)out.warn.push(t('wFlights',{n:flights}));}
+  Object.assign(out,{v,passes,len,n,work,usable,flights,air,field,endu,res,tol,turn,lineS});
+  return out;
+}
+
+/* ---------- Mapa (Leaflet) ---------- */
+const map=L.map('map',{zoomControl:true,attributionControl:true,preferCanvas:false}).setView([10.62,-71.75],14);
+L.control.scale({metric:true,imperial:false}).addTo(map);
+const Grid=L.GridLayer.extend({createTile:function(){const c=document.createElement('canvas');const s=this.getTileSize();c.width=s.x;c.height=s.y;const g=c.getContext('2d');
+  const cs=getComputedStyle(document.documentElement);g.fillStyle=cs.getPropertyValue('--field').trim()||'#F3F5F8';g.fillRect(0,0,s.x,s.y);
+  g.strokeStyle=cs.getPropertyValue('--grid').trim()||'#DCE2E9';g.lineWidth=1;g.strokeRect(0.5,0.5,s.x,s.y);return c;}});
+const gridLayer=new Grid();
+let baseLayers={none:gridLayer};
+if(STANDALONE){
+  baseLayers.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'});
+  baseLayers.osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,maxNativeZoom:19,attribution:'© OpenStreetMap contributors'});
+  $('#base-seg').hidden=false;
+}
+let curBase=null;
+function setBase(k){
+  if(curBase)map.removeLayer(baseLayers[curBase]);curBase=k;baseLayers[k].addTo(map);
+  ['sat','osm','none'].forEach(x=>{const b=$('#b-'+x);if(b)b.setAttribute('aria-pressed',x===k)});
+  $('#map').classList.toggle('sat',k==='sat');
+}
+setBase(STANDALONE?'sat':'none');
+['sat','osm','none'].forEach(x=>{const b=$('#b-'+x);if(b)b.onclick=()=>setBase(x)});
+const ov=L.layerGroup().addTo(map);
+let drawing=false,drawPts=[],fitNext=true;
+function render(r){
+  ov.clearLayers();
+  if(drawing){
+    if(drawPts.length){L.polyline(drawPts,{className:'lf-draw'}).addTo(ov);drawPts.forEach(p=>L.circleMarker(p,{radius:5,className:'lf-vtx'}).addTo(ov));}
+    return;
+  }
+  if(!r||r.none)return;
+  const ll=p=>toLL(p[0],p[1],origin);
+  const area=L.polygon(poly,{className:'lf-area'}).addTo(ov);
+  r.passes.forEach((g,i)=>L.polyline(g.path.map(ll),{className:i?'lf-path2':'lf-path'}).addTo(ov));
+  poly.forEach(p=>L.circleMarker(p,{radius:3.5,className:'lf-vtx'}).addTo(ov));
+  const s=r.passes[0]&&r.passes[0].path[0];if(s)L.circleMarker(ll(s),{radius:7,className:'lf-start'}).bindTooltip('Start',{permanent:false}).addTo(ov);
+  if(fitNext){const b=L.featureGroup(ov.getLayers()).getBounds();if(b.isValid())map.fitBounds(b,{padding:[30,30]});fitNext=false;}
+}
+
+/* ---------- Resultados ---------- */
+const metric=(k,v,u,hl)=>`<div class="m${hl?' hl':''}"><div class="k">${t(k)}</div><div class="v">${v}${u?`<small>${u}</small>`:''}</div></div>`;
+let last=null;
+function tags(){
+  const el=$('#tags');
+  if(mode==='photo'){const s=$('#c-shut').value;el.innerHTML=`<span class="tag ${s}">${lang==='es'?'Obturador':'Shutter'} ${t(s)}</span>`;}
+  else{el.innerHTML=`<span class="tag">${nf(num('#l-prr')/1000,0)} kHz</span><span class="tag">FOV ${nf(num('#l-fov'),0)}°</span>`;}
+  $('#rs-box').hidden=$('#rs-v-box').hidden=!(mode==='photo'&&$('#c-shut').value==='roll');
+}
+function update(){
+  tags();
+  const head=((num('#p-head')%180)+180)%180||0,r=compute(head);last=r;
+  const box=$('#res'),w=$('#warns');
+  if(r.none){box.innerHTML='';w.innerHTML=`<div class="w">${t('wNoArea')}</div>`;render(r);$('#fx').innerHTML='';return;}
+  const ha=r.area/1e4,areaTxt=ha>=1000?nf(r.area/1e6,2):nf(ha,ha<10?2:1),areaU=ha>=1000?'km²':'ha';
+  const bat=Number.isFinite(r.flights)?`${r.flights}`:'—',dv=r.data>=1024?nf(r.data/1024,1):nf(r.data,0),du=r.data>=1024?'GB':'MB';
+  let m='';
+  if(mode==='photo'){
+    m+=metric('rArea',areaTxt,areaU)+metric('rTime',dur(r.air),'',true)+metric('rPhotos',nf(r.photos),'',true)+metric('rBat',bat,t('flights'),true);
+    m+=metric('GSD',nf(r.gsd*100,2),'cm/px')+metric('rAlt',nf(r.H,0),'m AGL')+metric('rSpeed',nf(r.v,1),'m/s')+metric('rInt',nf(r.interval,2),'s');
+    m+=metric('rFoot',`${nf(r.W,0)}×${nf(r.L,0)}`,'m')+metric('rSpacing',nf(r.spacing,1),'m')+metric('rLines',nf(r.n),'')+metric('rLen',nf(r.len/1000,1),'km');
+    m+=metric('rData',dv,du)+metric('rBlur',nf(r.blur,2),'px')+metric('rField',dur(r.field),'')+metric('rVtrig',nf(r.vTrig,1),'m/s');
+  }else{
+    m+=metric('rArea',areaTxt,areaU)+metric('rTime',dur(r.air),'',true)+metric('rDens',nf(r.dens,0),'pts/m²',true)+metric('rBat',bat,t('flights'),true);
+    m+=metric('rAlt',nf(r.H,0),'m AGL')+metric('rSwath',nf(r.swath,0),'m')+metric('rSpacing',nf(r.spacing,0),'m')+metric('rDens1',nf(r.dens1,0),'pts/m²');
+    m+=metric('rPtSp',nf(r.ptsp*100,0),'cm')+metric('rSpeed',nf(r.v,1),'m/s')+metric('rLines',nf(r.n),'')+metric('rLen',nf(r.len/1000,1),'km');
+    m+=metric('rPts',nf(r.pts/1e6,0),'M')+metric('rData',dv,du+' LAS')+metric('rField',dur(r.field),'')+metric('rLine',dur(r.lineS/60),'');
+  }
+  box.innerHTML=m;
+  const ws=[...r.bad.map(x=>`<div class="w bad">${x}</div>`),...r.warn.map(x=>`<div class="w">${x}</div>`)];
+  w.innerHTML=ws.length?ws.join(''):`<div class="w ok">${t('okAll')}</div>`;
+  render(r);formulas(r);wxLink(r);
+}
+/* ---------- Enlace a Ventana de Vuelo ---------- */
+const VENTANA_FILE='ventana-de-vuelo.html';            // misma carpeta en el hosting
+const VENTANA_PUB='https://claude.ai/artifact/HBBzBK5f31yWxHsFiFYuaD';
+const WX_CAT=['m400','m350','m4e','m4t','m30t','m3e','m3m','p4r'];
+function wxLink(r){
+  const a=$('#btn-wx'),n=$('#wx-note');if(!a)return;
+  if(!r||r.none){a.setAttribute('aria-disabled','true');a.href='#';n.textContent='';return;}
+  a.removeAttribute('aria-disabled');
+  if(!STANDALONE){a.href=VENTANA_PUB;n.textContent=t('wxPub');return;}
+  const dk=$('#drone').value,q=new URLSearchParams({
+    lat:origin.lat.toFixed(5),lon:origin.lon.toFixed(5),drone:dk,alt:Math.round(r.H),
+    payload:mode==='lidar'?$('#sensor').value:'',field:Number.isFinite(r.field)?Math.round(r.field):'',
+    flights:Number.isFinite(r.flights)?r.flights:'',area:(r.area/1e4).toFixed(1),head:Math.round(num('#p-head')),
+    mode,name:DRONES[dk].n});
+  a.href=VENTANA_FILE+'?'+q.toString();
+  n.textContent=WX_CAT.includes(dk)?t('wxNote'):t('wxNoCat');
+}
+function formulas(r){
+  const F=(ti,ex)=>`<div><div class="lbl" style="margin-bottom:4px">${ti}</div><div class="fx">${ex}</div></div>`,es=lang==='es';let h='';
+  if(mode==='photo'){
+    h+=F(t('fGsd'),`GSD = (Sw · H) / (f · Iw) = (${nf(r.sw,1)} mm × ${nf(r.H,1)} m) / (${nf(r.f,2)} mm × ${nf(r.iw)} px) = ${nf(r.gsd*100,2)} cm/px`);
+    h+=F(t('fFoot'),`${es?'Ancho':'Width'} = ${nf(r.W,1)} m · ${es?'Largo':'Length'} = ${nf(r.L,1)} m`);
+    h+=F(t('fSp'),`S = ${nf(r.W,1)} × (1 − ${nf(r.so,2)}) = ${nf(r.spacing,1)} m · B = ${nf(r.L,1)} × (1 − ${nf(r.fo,2)}) = ${nf(r.base,1)} m`);
+    h+=F(t('fV'),`v<sub>máx</sub> = B / t<sub>min</sub> = ${nf(r.base,1)} / ${nf(r.trig,1)} = ${nf(r.vTrig,1)} m/s · Δt = B / v = ${nf(r.interval,2)} s · blur = v · t<sub>obt</sub> / GSD = ${nf(r.blur,2)} px`);
+    h+=F(t('fPh'),`Σ (⌈L<sub>i</sub> / B⌉ + 1) = ${nf(r.photos)} · ${nf(r.n)} ${es?'líneas':'lines'}`);
+  }else{
+    h+=F(t('fSw'),`W = 2 · H · tan(FOV/2) = 2 × ${nf(r.H,0)} × tan(${nf(r.fov/2,1)}°) = ${nf(r.swath,1)} m · S = W × (1 − ${nf(r.ov,2)}) = ${nf(r.spacing,1)} m`);
+    h+=F(t('fDen'),`ρ<sub>1</sub> = PRR / (v · W) = ${nf(r.prr)} / (${nf(r.v,1)} × ${nf(r.swath,1)}) = ${nf(r.dens1,0)} pts/m² · ρ = PRR / (v · S) = ${nf(r.dens,0)} pts/m²`);
+  }
+  h+=F(t('fT'),`T = ΣL / v + (n−1)·(S/v + t<sub>${es?'giro':'turn'}</sub>) = ${nf(r.work,1)} min · ${es?'autonomía útil':'usable'} = ${nf(r.endu,0)} × (1 − ${nf(r.res,2)}) − ${nf(r.tol,1)} = ${nf(r.usable,1)} min · ⌈${nf(r.work,1)} / ${nf(r.usable,1)}⌉ = ${Number.isFinite(r.flights)?r.flights:'—'}`);
+  h+=`<p class="note">${t('fNote')}</p>`;
+  $('#fx').innerHTML=h;
+}
+
+/* ---------- Área ---------- */
+function setSrcNote(){$('#area-src').textContent=srcType==='sample'?t('srcSample'):srcType==='kml'?t('srcKml')+srcName:t('srcDraw');}
+function loadSample(){
+  const o={lat:10.62,lon:-71.75},xy=[[-620,-430],[540,-520],[760,-60],[610,470],[-80,560],[-520,300],[-700,-60]];
+  poly=xy.map(p=>toLL(p[0],p[1],o));setOrigin();srcType='sample';setSrcNote();fitNext=true;update();
+}
+function parseKml(text,name){
+  const doc=new DOMParser().parseFromString(text,'text/xml');let c=null;const ps=doc.getElementsByTagName('Polygon');
+  if(ps.length){const ob=ps[0].getElementsByTagName('outerBoundaryIs')[0]||ps[0];c=ob.getElementsByTagName('coordinates')[0];}
+  if(!c)c=doc.getElementsByTagName('LinearRing')[0]?.getElementsByTagName('coordinates')[0]||doc.getElementsByTagName('coordinates')[0];
+  if(!c){$('#area-src').textContent=t('errKml');return;}
+  const pts=c.textContent.trim().split(/\s+/).map(s=>s.split(',').map(Number)).filter(a=>a.length>=2&&Number.isFinite(a[0])&&Number.isFinite(a[1])).map(a=>[a[1],a[0]]);
+  if(pts.length>1){const a=pts[0],b=pts[pts.length-1];if(Math.abs(a[0]-b[0])<1e-9&&Math.abs(a[1]-b[1])<1e-9)pts.pop();}
+  if(pts.length<3){$('#area-src').textContent=t('errKml');return;}
+  poly=pts;setOrigin();srcType='kml';srcName=name;setSrcNote();fitNext=true;update();
+}
+$('#btn-import').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{if(/\.kmz$/i.test(f.name)){const z=await JSZip.loadAsync(f),k=Object.keys(z.files).find(n=>/\.kml$/i.test(n));if(!k)throw 0;parseKml(await z.files[k].async('string'),f.name);}
+    else parseKml(await f.text(),f.name);}catch(err){$('#area-src').textContent=t('errKmz');}
+  e.target.value='';
+};
+$('#btn-sample').onclick=loadSample;
+function setDrawing(on){drawing=on;$('#map').classList.toggle('drawing',on);$('#draw-hint').hidden=!on;$('#btn-finish').hidden=!on;$('#btn-cancel').hidden=!on;$('#btn-draw').classList.toggle('on',on);if(on)map.doubleClickZoom.disable();else map.doubleClickZoom.enable();}
+$('#btn-draw').onclick=()=>{if(drawing)return;drawPts=[];setDrawing(true);render(last);};
+$('#btn-cancel').onclick=()=>{setDrawing(false);drawPts=[];update();};
+$('#btn-finish').onclick=()=>{if(drawPts.length>=3){poly=drawPts.slice();setOrigin();srcType='draw';setSrcNote();}setDrawing(false);drawPts=[];update();};
+map.on('click',e=>{if(!drawing)return;drawPts.push([e.latlng.lat,e.latlng.lng]);render(last);});
+
+$('#btn-opt').onclick=()=>{if(poly.length<3)return;let best=0,bt=Infinity;for(let h=0;h<180;h+=2){const r=compute(h);if(r.work<bt){bt=r.work;best=h;}}$('#p-head').value=best;update();};
+
+/* ---------- Exportación ---------- */
+function stamp(){const d=new Date();return d.toISOString().slice(0,10);}
+function buildKml(){
+  const r=last,ll=p=>{const g=toLL(p[0],p[1],origin);return `${g[1].toFixed(7)},${g[0].toFixed(7)}`;},alt=r.H;
+  let k=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>UAV ${mode==='photo'?'Photogrammetry':'LiDAR'} ${stamp()}</name>\n<description>${t('by')}</description>\n`;
+  k+=`<Style id="a"><LineStyle><color>ff875414</color><width>2</width></LineStyle><PolyStyle><color>33875414</color></PolyStyle></Style><Style id="p"><LineStyle><color>ff156ded</color><width>2</width></LineStyle></Style>\n`;
+  k+=`<Placemark><name>${t('area')}</name><styleUrl>#a</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${[...poly,poly[0]].map(p=>`${p[1].toFixed(7)},${p[0].toFixed(7)},0`).join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n`;
+  r.passes.forEach((g,i)=>{k+=`<Placemark><name>${t('path')} ${i+1}</name><styleUrl>#p</styleUrl><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>${g.path.map(p=>ll(p)+','+alt.toFixed(1)).join(' ')}</coordinates></LineString></Placemark>\n`;});
+  return k+`</Document></kml>`;
+}
+function buildGeoJSON(){
+  const r=last,ll=p=>{const g=toLL(p[0],p[1],origin);return [+g[1].toFixed(7),+g[0].toFixed(7)];};
+  return JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',properties:{name:t('area')},geometry:{type:'Polygon',coordinates:[[...poly,poly[0]].map(p=>[p[1],p[0]])]}},
+    ...r.passes.map((g,i)=>({type:'Feature',properties:{name:t('path')+' '+(i+1),alt_agl_m:r.H},geometry:{type:'LineString',coordinates:g.path.map(ll)}}))]},null,1);
+}
+function buildCsv(){
+  const r=last,es=lang==='es',rows=[[es?'Parámetro':'Parameter',es?'Valor':'Value',es?'Unidad':'Unit']];
+  const a=(k,v,u='')=>rows.push([k,v,u]);
+  a(es?'Elaborado por':'Prepared by','Ing. Geodesta Mario Forgione L.');a(es?'Fecha':'Date',stamp());
+  a(es?'Modo':'Mode',mode==='photo'?t('photo'):'LiDAR');a(t('drone'),DRONES[$('#drone').value].n);a(t(mode==='photo'?'camera':'lidar'),$('#sensor').selectedOptions[0].textContent);
+  a(t('rArea'),(r.area/1e4).toFixed(2),'ha');a(t('rAlt'),r.H.toFixed(1),'m AGL');
+  if(mode==='photo'){a('GSD',(r.gsd*100).toFixed(2),'cm/px');a(t('front'),(r.fo*100).toFixed(0),'%');a(t('side'),(r.so*100).toFixed(0),'%');a(t('rPhotos'),r.photos);a(t('rInt'),r.interval.toFixed(2),'s');a(t('rFoot'),`${r.W.toFixed(1)} x ${r.L.toFixed(1)}`,'m');a(t('cShut'),t(r.shut));}
+  else{a(t('rSwath'),r.swath.toFixed(1),'m');a(t('lOv'),(r.ov*100).toFixed(0),'%');a(t('rDens'),r.dens.toFixed(0),'pts/m2');a(t('rDens1'),r.dens1.toFixed(0),'pts/m2');a(t('lPrr'),r.prr,'pts/s');}
+  a(t('rSpacing'),r.spacing.toFixed(1),'m');a(t('rSpeed'),r.v.toFixed(1),'m/s');a(t('heading'),num('#p-head'),'°');a(t('rLines'),r.n);a(t('rLen'),(r.len/1000).toFixed(2),'km');
+  a(t('rTime'),r.air.toFixed(1),'min');a(t('rBat'),r.flights);a(t('rField'),r.field.toFixed(1),'min');a(t('rData'),r.data.toFixed(0),'MB');
+  return '﻿'+rows.map(x=>x.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(es?';':',')).join('\r\n');
+}
+function fname(ext){return `mision_uav_${mode==='photo'?'foto':'lidar'}_${stamp()}.${ext}`;}
+function note(s){const e=$('#exp-note');e.dataset.used='1';e.textContent=s;}
+function showText(text){$('#exp-box').hidden=false;$('#exp-text').value=text;$('#exp-text').select();}
+function directSave(name,blob){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);note(t('saved',{f:name}));}
+let dlNs;const getDl=async()=>{if(dlNs!==undefined)return dlNs;try{dlNs=(window.claude&&window.claude.use)?await window.claude.use('downloads'):null;}catch(e){dlNs=null;}return dlNs;};
+async function platformSave(name,data,fallbackText){
+  const d=await getDl();
+  if(!d){note(t('dlFail'));showText(fallbackText);return;}
+  try{await d.save({filename:name,data});note(t('saved',{f:name}));}
+  catch(e){if(e&&e.code==='declined')note(t('declined'));else if(e&&e.code==='rate_limited')note(e.message||'');else{note(t('dlFail'));showText(fallbackText);}}
+}
+$('#btn-kml').onclick=async()=>{
+  if(!last||last.none)return;const kml=buildKml();
+  if(STANDALONE){directSave(fname('kml'),new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}));return;}
+  const z=new JSZip();z.file('doc.kml',kml);z.file(fname('geojson'),buildGeoJSON());z.file(fname('csv'),buildCsv());
+  const blob=await z.generateAsync({type:'blob'});await platformSave(fname('zip'),blob,kml);
+};
+$('#btn-kmz').onclick=async()=>{if(!last||last.none)return;const z=new JSZip();z.file('doc.kml',buildKml());directSave(fname('kmz'),await z.generateAsync({type:'blob',mimeType:'application/vnd.google-earth.kmz'}));};
+$('#btn-csv').onclick=async()=>{if(!last||last.none)return;const c=buildCsv();if(STANDALONE)directSave(fname('csv'),new Blob([c],{type:'text/csv'}));else await platformSave(fname('csv'),c,c);};
+
+
+const DISC={
+es:['Esta herramienta es de uso referencial, para planificación preliminar y capacitación. Los resultados son estimaciones calculadas con modelos geométricos simplificados (terreno plano, proyección local, autonomía nominal y sin efecto del viento) y no sustituyen al software de planificación del fabricante ni el criterio del profesional a cargo de la operación.',
+'Las especificaciones técnicas de aeronaves y sensores provienen de fichas técnicas de fabricantes y distribuidores, y pueden cambiar sin previo aviso. La autonomía útil es una estimación con carga útil, y algunas focales se ajustaron para reproducir el GSD publicado por el fabricante. El usuario debe verificar los valores antes de usarlos en una propuesta técnica o comercial.',
+'Cada operación con aeronaves no tripuladas debe cumplir la normativa aeronáutica vigente en el país donde se realice (DGAC, INAC u otra autoridad competente), incluidos permisos, alturas máximas y zonas restringidas.',
+'El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta o de la información que presenta. Las marcas y nombres de productos mencionados pertenecen a sus respectivos titulares; su inclusión no implica patrocinio ni afiliación.'],
+en:['This tool is for reference, preliminary planning and training. Results are estimates based on simplified geometric models (flat terrain, local projection, nominal endurance, no wind) and do not replace the manufacturer’s planning software or the judgment of the professional in charge of the operation.',
+'Aircraft and sensor specifications come from manufacturer and distributor datasheets and may change without notice. Usable endurance is an estimate with payload, and some focal lengths were set to reproduce the GSD published by the manufacturer. Users should verify values before using them in a technical or commercial proposal.',
+'Every unmanned aircraft operation must comply with the aviation regulations in force in the country where it takes place (DGAC, INAC or another competent authority), including permits, maximum altitudes and restricted zones.',
+'The author accepts no liability for decisions, costs, damages or non-compliance arising from the use of this tool or the information it presents. Brands and product names belong to their respective owners; their inclusion implies no sponsorship or affiliation.']
+};
+const SRC=[
+['DJI',[['DJI – Enterprise products','https://www.dji.com/products/enterprise'],['Matrice 400 – Specs','https://enterprise.dji.com/matrice-400/specs'],['Matrice 350 RTK – Specs','https://enterprise.dji.com/matrice-350-rtk/specs'],['Matrice 4 Series – Specs','https://enterprise.dji.com/matrice-4-series/specs'],['Matrice 30 Series – Specs','https://enterprise.dji.com/matrice-30/specs'],['Mavic 3 Enterprise – Specs','https://enterprise.dji.com/mavic-3-enterprise/specs'],['Mavic 3M – Specs','https://enterprise.dji.com/mavic-3-m/specs'],['Phantom 4 RTK – Specs','https://www.dji.com/phantom-4-rtk/info'],['Zenmuse P1 – Specs','https://enterprise.dji.com/zenmuse-p1/specs'],['Zenmuse L2 – Specs','https://enterprise.dji.com/zenmuse-l2/specs'],['B&H – DJI Zenmuse L3','https://www.bhphotovideo.com/c/product/1934543-REG/dji_cp_en_00000703_01_zenmuse_l3_lidar.html'],['KOREC – Zenmuse L3','https://www.korecgroup.com/product/zenmuse-l3/']]],
+['Wingtra',[['Wingtra – WingtraOne GEN II','https://wingtra.com/wingtraone-gen-ii/'],['Advexure – WingtraRAY field guide','https://advexure.com/blogs/news/wingtraray-your-field-guide-to-wingtra-s-new-fixed-wing-vtol']]],
+['Autel',[['Autelpilot – EVO II Pro RTK V3','https://www.autelpilot.com/products/test-1'],['Autelpilot – EVO Max 4T V2','https://www.autelpilot.com/products/autel-robotics-evo-max-4t'],['DroneCompare – EVO Max 4T XE vs EVO II Pro RTK V3','https://dronecompare.org/compare/autel-evo-max-4t-xe-vs-autel-evo-ii-rtk-v3/']]],
+['Quantum-Systems · AgEagle · Sony',[['Quantum-Systems – Trinity Pro tech sheet','https://lp.quantum-systems.com/hubfs/Downloadables/QS_INT_Trinity_Pro_Techsheet_241015_Screen.pdf'],['Quantum-Systems – Trinity Pro cameras overview','https://lp.quantum-systems.com/hubfs/Downloadables/QS_Trinity_Pro_Overview_Cameras_V002_241023_Screen.pdf'],['AgEagle – eBee X brochure 2025','https://eaglenxt.com/wp-content/uploads/2025/05/eBee-X-2025-brochure-US-LETTER.pdf'],['KOREC – S.O.D.A. 3D','https://www.korecgroup.com/?p=23027'],['Apotelyt – Sony RX1R II sensor','https://apotelyt.com/camera-specs/sony-rx1r-ii-sensor-size'],['Apotelyt – Sony a6100 sensor','https://apotelyt.com/camera-specs/sony-a6100-sensor-size']]],
+['Cartografía / Mapping',[['Esri World Imagery','https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9'],['© OpenStreetMap contributors','https://www.openstreetmap.org/copyright'],['Leaflet','https://leafletjs.com'],['JSZip','https://stuk.github.io/jszip/']]]
+];
+function renderLegal(){
+  $('#disc').innerHTML=DISC[lang].map(p=>`<p>${p}</p>`).join('')+`<p>© 2026 Ing. Geodesta Mario Forgione L.</p>`;
+  $('#srcs').innerHTML=SRC.map(g=>`<li class="grp">${g[0]}</li>`+g[1].map(x=>`<li><a href="${x[1]}" target="_blank" rel="noopener">${x[0]}</a></li>`).join('')).join('');
+}
+
+/* ---------- Eventos / i18n ---------- */
+function applyLang(){
+  document.documentElement.lang=lang;
+  document.querySelectorAll('[data-t]').forEach(el=>{el.textContent=t(el.dataset.t)});
+  $('#lang-es').setAttribute('aria-pressed',lang==='es');$('#lang-en').setAttribute('aria-pressed',lang==='en');
+  $('#sensor-lbl').textContent=t(mode==='photo'?'camera':'lidar');
+  $('#btn-kml').textContent=STANDALONE?t('dlKml'):t('dlKml')+' (.zip)';
+  if(!STANDALONE&&!$('#exp-note').dataset.used)$('#exp-note').textContent=t('zipNote')+' '+t('noBase');
+  setSrcNote();renderLegal();update();
+}
+$('#mode-photo').onclick=()=>setMode('photo');$('#mode-lidar').onclick=()=>setMode('lidar');
+$('#lang-es').onclick=()=>{lang='es';applyLang();};$('#lang-en').onclick=()=>{lang='en';applyLang();};
+$('#drone').onchange=loadDrone;$('#sensor').onchange=loadSensor;
+$('#l-mode').onchange=()=>{applyL3();update();};
+$('#p-gsd').oninput=()=>{altFromGsd();update();};$('#p-alt').oninput=()=>{gsdFromAlt();update();};
+['#c-sw','#c-f','#c-iw'].forEach(id=>$(id).addEventListener('input',()=>{altFromGsd();update();}));
+document.querySelectorAll('input,select').forEach(el=>{if(!['p-gsd','p-alt','drone','sensor','file','l-mode'].includes(el.id))el.addEventListener('input',update);});
+if(STANDALONE)$('#btn-kmz').hidden=false;
+
+$('#p-gsd').value=2.0;$('#p-front').value=80;$('#p-side').value=70;$('#p-shutter').value=1600;$('#p-speed').value=12;$('#p-res').value=25;$('#p-head').value=0;$('#p-rsv').value=6;
+$('#l-alt').value=100;$('#l-ov').value=50;
+setMode('photo');loadSample();applyLang();
+$('#btn-opt').click();
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body></html>

@@ -1,0 +1,1426 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Conversor de Formatos Vectoriales</title>
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Conversión entre Shapefile, KML/KMZ, GeoJSON, DXF, GPX y CSV con reproyección y cambio de datum para Venezuela y Ecuador.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:18px 28px}
+.wrap{max-width:980px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+header h1{font-family:var(--f-disp); font-weight:800; font-size:clamp(22px,4.2vw,30px); letter-spacing:.04em; color:var(--brand); margin:0; line-height:1.05; text-transform:uppercase; text-wrap:balance}
+header h1 .u{color:var(--accent)}
+.sub{color:var(--muted); margin:6px 0 0; font-size:13.5px; max-width:70ch}
+.by{font:500 12px var(--f-mono); color:var(--ink); margin-top:8px; letter-spacing:.02em}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+.sec{padding:14px 16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px; min-width:0}
+.sec:first-child{border-top:0}
+.ptitle{display:flex; align-items:baseline; gap:10px; margin:0; font:700 14px var(--f-disp); text-transform:uppercase; letter-spacing:.06em; color:var(--brand)}
+.ptitle .n{font:500 12px var(--f-mono); color:var(--accent)}
+.lbl{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+.note{font-size:12.5px; color:var(--muted); margin:0}
+
+.drop{border:2px dashed var(--line); border-radius:8px; background:var(--field); padding:22px 16px; text-align:center; cursor:pointer; display:flex; flex-direction:column; gap:6px; align-items:center}
+.drop:hover,.drop.over{border-color:var(--accent); background:var(--brandsoft)}
+.drop b{font:700 14px var(--f-disp); letter-spacing:.05em; text-transform:uppercase; color:var(--brand)}
+.drop span{font-size:12.5px; color:var(--muted)}
+.btns{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.btn{font:600 13px var(--f-body); padding:8px 12px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font:700 13px var(--f-disp); letter-spacing:.06em; text-transform:uppercase; padding:11px 16px}
+.btn.pri:disabled{opacity:.45; cursor:not-allowed}
+.btn.sec2{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn:disabled{cursor:not-allowed}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible,.drop:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{font:500 12px var(--f-mono); background:var(--brandsoft); color:var(--brand); padding:3px 9px; border-radius:4px}
+.chip b{font-weight:600; color:var(--ink)}
+
+#map{height:340px; border-radius:6px; border:1px solid var(--line); background:var(--field); z-index:0}
+@media (max-width:640px){#map{height:260px}}
+details.tbl summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--brand)}
+.table-scroll{overflow:auto; max-height:260px; margin-top:8px; border:1px solid var(--line); border-radius:6px}
+table{border-collapse:collapse; font-size:12.5px; width:100%}
+th{position:sticky; top:0; background:var(--panel); text-align:left; font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line); white-space:nowrap}
+td{padding:5px 8px; border-bottom:1px solid var(--line); white-space:nowrap; max-width:260px; overflow:hidden; text-overflow:ellipsis}
+
+.grid2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px}
+@media (max-width:720px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.f{display:flex; flex-direction:column; gap:4px; min-width:0}
+.f label{font-size:12px; color:var(--muted)}
+select,input[type=text],input[type=number]{width:100%; font:500 13.5px var(--f-body); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px; min-width:0}
+select:disabled{opacity:.6}
+optgroup{font-style:normal; font-weight:600}
+.badge{display:inline-block; font:600 10.5px var(--f-body); letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid currentColor}
+.badge.ok{color:var(--ok)} .badge.warn{color:var(--warn)}
+
+.op{background:var(--field); border:1px solid var(--line); border-left:4px solid var(--brand); border-radius:6px; padding:10px 12px; font-size:13px; display:flex; flex-direction:column; gap:4px}
+.op b{font-weight:600}
+.op .mono{font-size:12px; color:var(--muted); overflow-wrap:anywhere}
+.msgs{display:flex; flex-direction:column; gap:6px}
+.msg{font-size:13px; padding:7px 10px; border-radius:5px; border-left:3px solid var(--brand); background:var(--field)}
+.msg[data-l="warn"]{border-left-color:var(--warn); background:var(--warnbg)}
+.msg[data-l="err"]{border-left-color:var(--bad); background:var(--badbg); color:var(--ink)}
+.msg[data-l="ok"]{border-left-color:var(--ok); background:var(--okbg)}
+
+.seg{display:flex; flex-wrap:wrap; gap:6px}
+.seg button{font:600 12.5px var(--f-body); padding:8px 12px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.sample{font:400 12px var(--f-mono); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:6px; padding:8px 10px; overflow-x:auto; white-space:pre}
+.chk{display:flex; gap:8px; align-items:center; font-size:13px}
+.chk input{accent-color:var(--accent); width:16px; height:16px}
+
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; font-size:12.5px; display:flex; flex-direction:column; gap:5px}
+.srcs li{color:var(--muted); overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+.leaflet-popup-content{font:12px var(--f-body); max-height:220px; overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Conversor de formatos <span class="u">vectoriales</span></h1>
+  <p class="sub">Shapefile, KML/KMZ, GeoJSON, DXF, GPX y CSV, con reproyección UTM y cambio de datum para Venezuela (REGVEN · La Canoa) y Ecuador (SIRGAS-ECU · PSAD56). Los archivos se procesan en su equipo y no se envían a ningún servidor.</p>
+  <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+</header>
+
+<section class="panel" aria-labelledby="t1">
+  <div class="sec">
+    <h2 class="ptitle" id="t1"><span class="n">01</span>Archivo de entrada</h2>
+    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Seleccionar o arrastrar archivos">
+      <b>Arrastre aquí su archivo</b>
+      <span>o haga clic para seleccionarlo</span>
+      <span class="mono">.zip/.shp+.dbf+.prj · .kml · .kmz · .geojson · .json · .dxf · .gpx · .csv · .txt</span>
+    </div>
+    <input type="file" id="file" multiple hidden accept=".zip,.shp,.shx,.dbf,.prj,.cpg,.kml,.kmz,.geojson,.json,.dxf,.gpx,.csv,.txt">
+    <div class="btns"><span class="note">Probar con un ejemplo:</span>
+      <button class="btn" type="button" id="exEC">Ecuador · Quito</button>
+      <button class="btn" type="button" id="exVE">Venezuela · Maracaibo</button>
+    </div>
+    <div class="msgs" id="loadMsgs"></div>
+    <div class="chips" id="summary"></div>
+  </div>
+  <div class="sec" id="secPreview" hidden>
+    <div class="lbl">Vista previa</div>
+    <div id="map" role="img" aria-label="Mapa de vista previa de los elementos cargados"></div>
+    <details class="tbl"><summary id="tblSum">Tabla de atributos</summary>
+      <div class="table-scroll"><table id="tbl"></table></div>
+    </details>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="t2">
+  <div class="sec">
+    <h2 class="ptitle" id="t2"><span class="n">02</span>Sistemas de coordenadas</h2>
+    <div class="grid2">
+      <div class="f"><label for="selSrc">Origen <span id="srcBadge"></span></label><select id="selSrc" disabled></select>
+        <p class="note" id="srcNote"></p></div>
+      <div class="f"><label for="selDst">Destino</label><select id="selDst" disabled></select>
+        <p class="note" id="dstNote"></p></div>
+    </div>
+    <div class="op" id="op" hidden></div>
+    <div class="msgs" id="crsMsgs"></div>
+    <div id="sampleBox" hidden><div class="lbl" style="margin-bottom:6px">Control: primer vértice</div><div class="sample" id="sample"></div></div>
+  </div>
+</section>
+
+<section class="panel" aria-labelledby="t3">
+  <div class="sec">
+    <h2 class="ptitle" id="t3"><span class="n">03</span>Formato de salida</h2>
+    <div class="seg" id="segFmt" role="group" aria-label="Formato de salida">
+      <button type="button" data-f="shp" aria-pressed="true">Shapefile</button>
+      <button type="button" data-f="kml" aria-pressed="false">KML</button>
+      <button type="button" data-f="kmz" aria-pressed="false">KMZ</button>
+      <button type="button" data-f="geojson" aria-pressed="false">GeoJSON</button>
+      <button type="button" data-f="dxf" aria-pressed="false">DXF</button>
+      <button type="button" data-f="gpx" aria-pressed="false">GPX</button>
+      <button type="button" data-f="csv" aria-pressed="false">CSV</button>
+    </div>
+    <div class="grid2" id="fmtOpts">
+      <div class="f" id="optName"><label for="selName">Campo para el nombre</label><select id="selName"></select></div>
+      <div class="f" id="optLayer"><label for="selLayer">Campo para las capas DXF</label><select id="selLayer"></select></div>
+      <div class="f" id="optDelim"><label for="selDelim">Separador CSV</label>
+        <select id="selDelim"><option value=",">Coma ( , ) · decimal con punto</option><option value=";">Punto y coma ( ; ) · decimal con punto</option><option value="\t">Tabulación</option></select></div>
+      <label class="chk" id="optLabels"><input type="checkbox" id="chkLabels"> Rotular entidades DXF con el campo de nombre</label>
+    </div>
+    <div class="msgs" id="fmtMsgs"></div>
+    <div class="btns">
+      <button class="btn pri" type="button" id="btnGo" disabled>Convertir y descargar</button>
+      <button class="btn" type="button" id="btnRep" disabled>Descargar informe (.txt)</button>
+    </div>
+    <div class="msgs" id="outMsgs"></div>
+  </div>
+</section>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Herramienta de apoyo técnico para el intercambio de datos vectoriales entre programas. No es un producto certificado y no sustituye el software geodésico oficial, los vértices de control ni el criterio del profesional responsable.</p>
+    <p>Los cambios de datum emplean los parámetros publicados por el IGVSB/LGFS (PATVEN-98, Venezuela) y por el IGM (PSAD56 → SIRGAS, Ecuador continental, exactitud ±5 m, para escalas 1:25 000 y menores). SIRGAS-ECU, REGVEN y WGS 84 se tratan como equivalentes, una aproximación válida a nivel métrico; no se modelan los desplazamientos entre épocas de referencia (por ejemplo, los del sismo de Pedernales de 2016). PSAD56 no está definido en Galápagos. Solo se transforma la parte horizontal; la coordenada Z se conserva sin cambios.</p>
+    <p>Cada formato tiene limitaciones propias (nombres de campo de 10 caracteres en Shapefile, KML y GPX solo en WGS 84, DXF sin tabla de atributos, entre otras); la herramienta las advierte antes de convertir. Verifique siempre el resultado en su programa SIG o CAD.</p>
+    <p>El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta. Las marcas y nombres de productos mencionados pertenecen a sus respectivos titulares.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+      <li class="grp">Venezuela</li>
+      <li>IGVSB / LGFS — Parámetros oficiales PATVEN-98, La Canoa (PSAD56) → REGVEN (SIRGAS), Molodensky-Badekas con punto fundamental</li>
+      <li><a href="https://epsg.io/4189" target="_blank" rel="noopener">EPSG 4189 — REGVEN</a> · <a href="https://epsg.io/2201" target="_blank" rel="noopener">2201–2203 REGVEN / UTM 18N–20N</a></li>
+      <li class="grp">Ecuador</li>
+      <li><a href="https://epsg.io/3990" target="_blank" rel="noopener">EPSG 3971 / 3990 — PSAD56 → SIRGAS 1995, parámetros IGM Ecuador (Coordinate Frame)</a></li>
+      <li><a href="https://epsg.io/31992" target="_blank" rel="noopener">EPSG 31992 — SIRGAS 1995 / UTM 17S (Ecuador continental completo)</a></li>
+      <li><a href="https://epsg.io/24817" target="_blank" rel="noopener">EPSG 24817 / 24818 / 24877 / 24878 — PSAD56 / UTM 17N, 18N, 17S, 18S</a></li>
+      <li><a href="https://epsg.io/32715" target="_blank" rel="noopener">EPSG 32715 / 32716 — WGS 84 / UTM 15S y 16S (Galápagos)</a></li>
+      <li><a href="https://www.sirgas.org/fileadmin/docs/Boletines/Bol15/37_Zurita_et_al_Reporte_Ecuador.pdf" target="_blank" rel="noopener">SIRGAS — Reporte Ecuador (Zurita et al.): SIRGAS-ECU y parámetros PSAD56</a></li>
+      <li><a href="https://revistasipgh.org/index.php/regeofi/article/download/161/168/315" target="_blank" rel="noopener">Revista Geofísica IPGH — SIRGAS-Ecuador, época 2016.4</a></li>
+      <li class="grp">Métodos y formatos</li>
+      <li><a href="https://epsg.org/guidance-notes.html" target="_blank" rel="noopener">IOGP — Guidance Note 7-2 (Molodensky-Badekas, Coordinate Frame)</a></li>
+      <li><a href="https://doi.org/10.1007/s00190-011-0445-3" target="_blank" rel="noopener">Karney (2011) — Transverse Mercator with an accuracy of a few nanometers</a></li>
+      <li>ESRI — Shapefile Technical Description (1998) · Autodesk — DXF Reference (R12)</li>
+      <li><a href="https://www.ogc.org/standard/kml/" target="_blank" rel="noopener">OGC — KML 2.2</a> · <a href="https://datatracker.ietf.org/doc/html/rfc7946" target="_blank" rel="noopener">IETF RFC 7946 — GeoJSON</a> · <a href="https://www.topografix.com/gpx.asp" target="_blank" rel="noopener">GPX 1.1</a></li>
+      <li class="grp">Librerías y cartografía</li>
+      <li><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a> · <a href="https://stuk.github.io/jszip/" target="_blank" rel="noopener">JSZip</a></li>
+      <li><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri World Imagery</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   GEODESIA
+   ===================================================================== */
+const D2R = Math.PI/180, S2R = Math.PI/(180*3600);
+const ELL = {
+  WGS84:{a:6378137, f:1/298.257223563, name:'WGS 84'},
+  GRS80:{a:6378137, f:1/298.257222101, name:'GRS 1980'},
+  INTL: {a:6378388, f:1/297, name:'Internacional 1924 (Hayford)'}
+};
+const DATUM = {
+  WGS84: {name:'WGS 84', ell:'WGS84', esri:['GCS_WGS_1984','D_WGS_1984','WGS_1984',6378137,298.257223563]},
+  SIRGAS:{name:'SIRGAS-ECU (SIRGAS 1995)', ell:'GRS80', esri:['GCS_SIRGAS','D_SIRGAS','GRS_1980',6378137,298.257222101]},
+  REGVEN:{name:'REGVEN (SIRGAS)', ell:'GRS80', esri:['GCS_REGVEN','D_REGVEN','GRS_1980',6378137,298.257222101]},
+  CANOA: {name:'La Canoa (PSAD56) · Venezuela', ell:'INTL', esri:['GCS_La_Canoa','D_La_Canoa','International_1924',6378388,297]},
+  PSADEC:{name:'PSAD56 · Ecuador continental', ell:'INTL', esri:['GCS_Provisional_S_American_1956','D_Provisional_S_American_1956','International_1924',6378388,297]}
+};
+
+// PATVEN-98 (IGVSB/LGFS) — Molodensky-Badekas, convención Coordinate Frame (igual que el Transformador de Datum)
+const PATVEN = { tX:-270.933, tY:115.599, tZ:-360.226, rX:-5.266*S2R, rY:-1.238*S2R, rZ:2.381*S2R, dS:-5.109e-6,
+  Xp:2464351.59, Yp:-5783466.61, Zp:974809.81 };
+// IGM Ecuador PSAD56 → SIRGAS (EPSG 3971/3990) — Coordinate Frame, 7 parámetros, sin punto de rotación
+const IGMEC = { tX:-60.310, tY:245.935, tZ:31.008, rX:-12.324*S2R, rY:-3.755*S2R, rZ:7.370*S2R, dS:0.447e-6,
+  Xp:0, Yp:0, Zp:0 };
+
+function geo2cart(lat, lon, h, ell){
+  const p = lat*D2R, l = lon*D2R, e2 = ell.f*(2-ell.f);
+  const N = ell.a/Math.sqrt(1-e2*Math.sin(p)**2);
+  return [(N+h)*Math.cos(p)*Math.cos(l), (N+h)*Math.cos(p)*Math.sin(l), (N*(1-e2)+h)*Math.sin(p)];
+}
+function cart2geo(X, Y, Z, ell){
+  const e2 = ell.f*(2-ell.f), lon = Math.atan2(Y,X), p = Math.hypot(X,Y);
+  let lat = Math.atan2(Z, p*(1-e2)), N, h = 0;
+  for(let i=0;i<8;i++){ N = ell.a/Math.sqrt(1-e2*Math.sin(lat)**2); h = p/Math.cos(lat)-N; lat = Math.atan2(Z, p*(1-e2*N/(N+h))); }
+  return [lat/D2R, lon/D2R, h];
+}
+function simFwd(X,Y,Z,P){
+  const dX=X-P.Xp, dY=Y-P.Yp, dZ=Z-P.Zp, M=1+P.dS;
+  return [P.Xp+P.tX+M*(dX+P.rZ*dY-P.rY*dZ), P.Yp+P.tY+M*(-P.rZ*dX+dY+P.rX*dZ), P.Zp+P.tZ+M*(P.rY*dX-P.rX*dY+dZ)];
+}
+function simInv(X,Y,Z,P){
+  const M=1+P.dS, R=[1,P.rZ,-P.rY, -P.rZ,1,P.rX, P.rY,-P.rX,1].map(v=>v*M);
+  const [a,b,c,d,e,f,g,h,i]=R;
+  const A=e*i-f*h, B=-(d*i-f*g), C=d*h-e*g, Dd=-(b*i-c*h), E=a*i-c*g, F=-(a*h-b*g), G=b*f-c*e, H=-(a*f-c*d), I=a*e-b*d;
+  const det=a*A+b*B+c*C;
+  const bx=X-P.Xp-P.tX, by=Y-P.Yp-P.tY, bz=Z-P.Zp-P.tZ;
+  return [P.Xp+(A*bx+Dd*by+G*bz)/det, P.Yp+(B*bx+E*by+H*bz)/det, P.Zp+(C*bx+F*by+I*bz)/det];
+}
+// Datum → pivote (GRS80/WGS84 geográficas) y viceversa. Solo horizontal (h = 0).
+function toPivot(datum, lat, lon){
+  if(datum==='CANOA' || datum==='PSADEC'){
+    const P = datum==='CANOA' ? PATVEN : IGMEC;
+    const c = simFwd(...geo2cart(lat,lon,0,ELL.INTL), P);
+    const g = cart2geo(...c, ELL.GRS80); return [g[0], g[1]];
+  }
+  return [lat, lon];
+}
+function fromPivot(datum, lat, lon){
+  if(datum==='CANOA' || datum==='PSADEC'){
+    const P = datum==='CANOA' ? PATVEN : IGMEC;
+    const c = simInv(...geo2cart(lat,lon,0,ELL.GRS80), P);
+    let g = cart2geo(...c, ELL.INTL);
+    // Refinamiento: la operación es 2D (h = 0 en ambos sentidos); se itera para que ida y vuelta coincidan
+    for(let i=0;i<4;i++){ const f = toPivot(datum, g[0], g[1]); g = [g[0]+(lat-f[0]), g[1]+(lon-f[1])]; }
+    return [g[0], g[1]];
+  }
+  return [lat, lon];
+}
+
+// Transversa de Mercator — series de Krüger de 6.º orden (Karney 2011): exacta al mm incluso en zonas extendidas
+const TMC = new Map();
+function tmCoef(ell){
+  if(TMC.has(ell)) return TMC.get(ell);
+  const f=ell.f, n=f/(2-f), n2=n*n, n3=n2*n, n4=n3*n, n5=n4*n, n6=n5*n;
+  const c = {
+    A: ell.a/(1+n)*(1+n2/4+n4/64+n6/256), e: Math.sqrt(f*(2-f)),
+    al:[0, n/2-2*n2/3+5*n3/16+41*n4/180-127*n5/288+7891*n6/37800,
+        13*n2/48-3*n3/5+557*n4/1440+281*n5/630-1983433*n6/1935360,
+        61*n3/240-103*n4/140+15061*n5/26880+167603*n6/181440,
+        49561*n4/161280-179*n5/168+6601661*n6/7257600,
+        34729*n5/80640-3418889*n6/1995840,
+        212378941*n6/319334400],
+    be:[0, n/2-2*n2/3+37*n3/96-n4/360-81*n5/512+96199*n6/604800,
+        n2/48+n3/15-437*n4/1440+46*n5/105-1118711*n6/3870720,
+        17*n3/480-37*n4/840-209*n5/4480+5569*n6/90720,
+        4397*n4/161280-11*n5/504-830251*n6/7257600,
+        4583*n5/161280-108847*n6/3991680,
+        20648693*n6/638668800]
+  };
+  TMC.set(ell,c); return c;
+}
+const K0 = 0.9996;
+const cmOf = z => z*6-183;
+function utmFwd(lat, lon, zone, south, ell){
+  const c = tmCoef(ell), phi = lat*D2R, lam = (lon-cmOf(zone))*D2R, sp = Math.sin(phi);
+  const t = Math.sinh(Math.atanh(sp) - c.e*Math.atanh(c.e*sp));
+  const xp = Math.atan2(t, Math.cos(lam)), ep = Math.atanh(Math.sin(lam)/Math.sqrt(1+t*t));
+  let xi = xp, eta = ep;
+  for(let j=1;j<=6;j++){ xi += c.al[j]*Math.sin(2*j*xp)*Math.cosh(2*j*ep); eta += c.al[j]*Math.cos(2*j*xp)*Math.sinh(2*j*ep); }
+  return [500000 + K0*c.A*eta, (south?10000000:0) + K0*c.A*xi];
+}
+function utmInv(E, N, zone, south, ell){
+  const c = tmCoef(ell), xi = (N-(south?10000000:0))/(K0*c.A), eta = (E-500000)/(K0*c.A);
+  let xp = xi, ep = eta;
+  for(let j=1;j<=6;j++){ xp -= c.be[j]*Math.sin(2*j*xi)*Math.cosh(2*j*eta); ep -= c.be[j]*Math.cos(2*j*xi)*Math.sinh(2*j*eta); }
+  const tp = Math.sin(xp)/Math.sqrt(Math.sinh(ep)**2 + Math.cos(xp)**2);
+  let tau = tp, e2 = c.e*c.e;
+  for(let i=0;i<10;i++){
+    const s = Math.sinh(c.e*Math.atanh(c.e*tau/Math.sqrt(1+tau*tau)));
+    const ti = tau*Math.sqrt(1+s*s) - s*Math.sqrt(1+tau*tau);
+    const d = (tp-ti)/Math.sqrt(1+ti*ti)*(1+(1-e2)*tau*tau)/((1-e2)*Math.sqrt(1+tau*tau));
+    tau += d; if(Math.abs(d)<1e-14) break;
+  }
+  return [Math.atan(tau)/D2R, cmOf(zone) + Math.atan2(Math.sinh(ep), Math.cos(xp))/D2R];
+}
+// Factor de escala puntual (aproximación de orden 2, suficiente para advertencias)
+function scaleK(lat, lon, zone){
+  const p=lat*D2R, l=(lon-cmOf(zone))*D2R, ep2=0.00673949677548, c2=Math.cos(p)**2;
+  return K0*(1 + l*l*c2/2*(1+ep2*c2));
+}
+
+/* =====================================================================
+   CATÁLOGO DE SISTEMAS
+   ===================================================================== */
+const ZONES = {
+  WGS84:  ['15N','16N','17N','18N','19N','20N','21N','15S','16S','17S','18S'],
+  SIRGAS: ['15N','15S','16N','16S','17N','17S','18N','18S'],
+  PSADEC: ['17N','17S','18N','18S'],
+  REGVEN: ['18N','19N','20N'],
+  CANOA:  ['18N','19N','20N']
+};
+const EPSG = {
+  'WGS84:geo':4326, 'SIRGAS:geo':4170, 'REGVEN:geo':4189, 'CANOA:geo':4247, 'PSADEC:geo':4248,
+  'SIRGAS:17N':31986, 'SIRGAS:18N':31987, 'SIRGAS:17S':31992, 'SIRGAS:18S':31993,
+  'REGVEN:18N':2201, 'REGVEN:19N':2202, 'REGVEN:20N':2203,
+  'CANOA:18N':24718, 'CANOA:19N':24719, 'CANOA:20N':24720,
+  'PSADEC:17N':24817, 'PSADEC:18N':24818, 'PSADEC:17S':24877, 'PSADEC:18S':24878
+};
+function epsgOf(datum, type, zs){
+  if(datum==='WGS84' && type==='utm'){ const z=parseInt(zs,10); return (zs.endsWith('S')?32700:32600)+z; }
+  return EPSG[datum+':'+(type==='geo'?'geo':zs)] || null;
+}
+const GROUPS = [
+  ['WGS84','Global — WGS 84'],
+  ['SIRGAS','Ecuador — SIRGAS-ECU (oficial)'],
+  ['PSADEC','Ecuador — PSAD56 (continental)'],
+  ['REGVEN','Venezuela — REGVEN (oficial)'],
+  ['CANOA','Venezuela — La Canoa (PSAD56)']
+];
+const SHORT = {WGS84:'WGS 84', SIRGAS:'SIRGAS-ECU', PSADEC:'PSAD56 Ecuador', REGVEN:'REGVEN', CANOA:'La Canoa'};
+function crsParse(id){ const [datum, t] = id.split(':'); if(t==='geo') return {id, datum, type:'geo'}; if(t==='auto') return {id, datum, type:'auto'};
+  return {id, datum, type:'utm', zs:t, zone:parseInt(t,10), south:t.endsWith('S')}; }
+function crsLabel(c){
+  if(c.type==='geo') return `${SHORT[c.datum]} · geográficas (lat/lon)`;
+  if(c.type==='auto') return `${SHORT[c.datum]} · UTM automático por longitud`;
+  return `${SHORT[c.datum]} · UTM ${c.zs}`;
+}
+function crsFull(c){ const e = c.type==='auto'?null:epsgOf(c.datum,c.type,c.zs); return crsLabel(c)+(e?` (EPSG ${e})`:''); }
+function buildOptions(sel, withAuto){
+  let h='';
+  for(const [d,g] of GROUPS){
+    h += `<optgroup label="${g}">`;
+    const ids=[d+':geo'];
+    if(withAuto) ids.push(d+':auto');
+    ZONES[d].forEach(z=>ids.push(d+':'+z));
+    for(const id of ids){ const c=crsParse(id); const e=c.type==='auto'?null:epsgOf(c.datum,c.type,c.zs);
+      h += `<option value="${id}">${crsLabel(c)}${e?' · EPSG '+e:''}</option>`; }
+    h += '</optgroup>';
+  }
+  sel.innerHTML = h;
+}
+function wktOf(c){
+  const [gn,dn,sn,a,rf] = DATUM[c.datum].esri;
+  const geog = `GEOGCS["${gn}",DATUM["${dn}",SPHEROID["${sn}",${a},${rf}]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]`;
+  if(c.type==='geo') return geog;
+  const name = `${gn.replace(/^GCS_/,'')}_UTM_Zone_${c.zone}${c.south?'S':'N'}`;
+  return `PROJCS["${name}",${geog},PROJECTION["Transverse_Mercator"],PARAMETER["False_Easting",500000.0],PARAMETER["False_Northing",${c.south?'10000000.0':'0.0'}],PARAMETER["Central_Meridian",${cmOf(c.zone)}.0],PARAMETER["Scale_Factor",0.9996],PARAMETER["Latitude_Of_Origin",0.0],UNIT["Meter",1.0]]`;
+}
+
+/* Regiones de validez */
+const BOX = {
+  VE:  {latMin:0.4, latMax:16.0, lonMin:-73.8, lonMax:-59.2},
+  EC:  {latMin:-5.2, latMax:1.7, lonMin:-81.3, lonMax:-75.0},
+  GAL: {latMin:-1.8, latMax:1.9, lonMin:-92.3, lonMax:-89.0}
+};
+const inBox = (b,lat,lon) => lat>=b.latMin && lat<=b.latMax && lon>=b.lonMin && lon<=b.lonMax;
+
+/* =====================================================================
+   MODELO DE DATOS — features: {g:{type,coordinates}, p:{...}} en coordenadas del origen
+   ===================================================================== */
+const S = { data:null, srcId:null, dstId:null, fmt:'shp', piv:null, plan:null, map:null, layer:null };
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const CLASS = {Point:'point', MultiPoint:'point', LineString:'line', MultiLineString:'line', Polygon:'poly', MultiPolygon:'poly'};
+const CLASS_NAME = {point:'puntos', line:'líneas', poly:'polígonos'};
+
+function mapGeom(g, fn){
+  const r1 = c => fn(c), r2 = a => a.map(r1), r3 = a => a.map(r2), r4 = a => a.map(r3);
+  switch(g.type){
+    case 'Point': return {type:g.type, coordinates:r1(g.coordinates)};
+    case 'MultiPoint': case 'LineString': return {type:g.type, coordinates:r2(g.coordinates)};
+    case 'MultiLineString': case 'Polygon': return {type:g.type, coordinates:r3(g.coordinates)};
+    case 'MultiPolygon': return {type:g.type, coordinates:r4(g.coordinates)};
+  }
+  return g;
+}
+function eachCoord(g, fn){ mapGeom(g, c=>{ fn(c); return c; }); }
+function countVerts(features){ let n=0; for(const f of features) eachCoord(f.g, ()=>n++); return n; }
+function fieldsOf(features, order){
+  const seen = new Set(order||[]), list = [...(order||[])];
+  for(const f of features) for(const k of Object.keys(f.p)) if(!seen.has(k)){ seen.add(k); list.push(k); }
+  return list;
+}
+
+/* =====================================================================
+   LECTORES
+   ===================================================================== */
+const extOf = n => (n.split('.').pop()||'').toLowerCase();
+const baseOf = n => n.replace(/^.*[\\/]/,'').replace(/\.[^.]+$/,'');
+function decodeText(u8, hint){
+  if(hint){ try{ return new TextDecoder(hint).decode(u8); }catch(e){} }
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(u8); }catch(e){ return new TextDecoder('windows-1252').decode(u8); }
+}
+function cpgToLabel(s){
+  s = (s||'').trim().toUpperCase();
+  if(!s) return null;
+  if(/UTF-?8|65001/.test(s)) return 'utf-8';
+  if(/1252|ANSI|LATIN|8859-1|ISO88591/.test(s)) return 'windows-1252';
+  if(/850/.test(s)) return 'ibm850';
+  return null;
+}
+
+// ---------- Shapefile ----------
+function readShp(buf){
+  const dv = new DataView(buf), out = [];
+  if(dv.getInt32(0,false)!==9994) throw new Error('El .shp no tiene un encabezado válido.');
+  const len = dv.getInt32(24,false)*2;
+  let off = 100;
+  while(off+8 <= Math.min(len, buf.byteLength)){
+    const cl = dv.getInt32(off+4,false)*2, o = off+8;
+    off = o+cl;
+    if(cl<4){ out.push(null); continue; }
+    const t = dv.getInt32(o,true);
+    if(t===0){ out.push(null); continue; }
+    const hasZ = [11,13,15,18].includes(t);
+    if(t===1||t===11||t===21){
+      const c=[dv.getFloat64(o+4,true), dv.getFloat64(o+12,true)];
+      if(t===11) c.push(dv.getFloat64(o+20,true));
+      out.push({type:'Point', coordinates:c}); continue;
+    }
+    if(t===8||t===18||t===28){
+      const np = dv.getInt32(o+36,true), pts=[];
+      for(let i=0;i<np;i++) pts.push([dv.getFloat64(o+40+16*i,true), dv.getFloat64(o+48+16*i,true)]);
+      if(hasZ){ const zo=o+40+16*np+16; for(let i=0;i<np;i++) pts[i].push(dv.getFloat64(zo+8*i,true)); }
+      out.push({type:'MultiPoint', coordinates:pts}); continue;
+    }
+    if([3,5,13,15,23,25].includes(t)){
+      const nParts=dv.getInt32(o+36,true), np=dv.getInt32(o+40,true), parts=[];
+      for(let i=0;i<nParts;i++) parts.push(dv.getInt32(o+44+4*i,true));
+      const po=o+44+4*nParts, pts=[];
+      for(let i=0;i<np;i++) pts.push([dv.getFloat64(po+16*i,true), dv.getFloat64(po+8+16*i,true)]);
+      if(hasZ){ const zo=po+16*np+16; for(let i=0;i<np;i++) pts[i].push(dv.getFloat64(zo+8*i,true)); }
+      const rings = parts.map((s,i)=>pts.slice(s, i+1<nParts?parts[i+1]:np));
+      if(t===3||t===13||t===23) out.push(rings.length===1?{type:'LineString',coordinates:rings[0]}:{type:'MultiLineString',coordinates:rings});
+      else out.push(assemblePolygons(rings));
+      continue;
+    }
+    out.push({unsupported:t});
+  }
+  return out;
+}
+const ringArea = r => { let s=0; for(let i=0;i<r.length-1;i++) s += r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1]; return s/2; };
+function pip(pt, ring){ let ins=false; for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const [xi,yi]=ring[i],[xj,yj]=ring[j];
+  if(((yi>pt[1])!==(yj>pt[1])) && (pt[0] < (xj-xi)*(pt[1]-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+function assemblePolygons(rings){
+  const outers=[], holes=[];
+  for(const r of rings){ if(r.length<4) continue; (ringArea(r)<0 ? outers : holes).push(r); } // en .shp el anillo exterior va en sentido horario
+  if(!outers.length){ outers.push(...holes.splice(0)); }
+  const polys = outers.map(o=>[o]);
+  for(const h of holes){ const p = polys.find(pp=>pip(h[0], pp[0])); if(p) p.push(h); else polys.push([h]); }
+  return polys.length===1 ? {type:'Polygon', coordinates:polys[0]} : {type:'MultiPolygon', coordinates:polys};
+}
+function readDbf(buf, enc){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const n = dv.getUint32(4,true), hl = dv.getUint16(8,true), rl = dv.getUint16(10,true);
+  const fields=[]; let fo=32, pos=1;
+  while(fo < hl-1 && u8[fo]!==0x0D){
+    let name=''; for(let i=0;i<11 && u8[fo+i];i++) name+=String.fromCharCode(u8[fo+i]);
+    fields.push({name:name.trim(), type:String.fromCharCode(u8[fo+11]), len:u8[fo+16], dec:u8[fo+17], pos});
+    pos += u8[fo+16]; fo += 32;
+  }
+  const dec = new TextDecoder(enc||'utf-8'), rows=[];
+  let encUsed = enc;
+  if(!enc){ // probar UTF-8 estricto sobre todos los registros; si falla, Windows-1252
+    try{ new TextDecoder('utf-8',{fatal:true}).decode(u8.subarray(hl, hl+n*rl)); encUsed='utf-8'; }catch(e){ encUsed='windows-1252'; }
+  }
+  const D = new TextDecoder(encUsed);
+  for(let r=0;r<n;r++){
+    const ro = hl + r*rl; if(ro+rl>u8.length) break;
+    const rec = {}, del = u8[ro]===0x2A;
+    for(const f of fields){
+      const raw = D.decode(u8.subarray(ro+f.pos, ro+f.pos+f.len)).replace(/\0/g,'').trim();
+      let v = raw;
+      if(f.type==='N'||f.type==='F'){ v = raw==='' ? null : Number(raw); if(Number.isNaN(v)) v=null; }
+      else if(f.type==='L'){ v = /^[YyTt]$/.test(raw) ? true : /^[NnFf]$/.test(raw) ? false : null; }
+      else if(f.type==='D'){ v = /^\d{8}$/.test(raw) ? `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6)}` : (raw||null); }
+      rec[f.name] = v;
+    }
+    rows.push(del?null:rec);
+  }
+  return {fields, rows, enc:encUsed};
+}
+
+// ---------- KML ----------
+const kids = (el, name) => Array.from(el.children).filter(c=>c.localName===name);
+const kid = (el, name) => kids(el,name)[0];
+const desc = (el, name) => Array.from(el.getElementsByTagNameNS('*', name));
+function kmlCoords(txt){ return (txt||'').trim().split(/\s+/).filter(Boolean).map(s=>{ const a=s.split(',').map(Number); return a.length>2&&!Number.isNaN(a[2])?[a[0],a[1],a[2]]:[a[0],a[1]]; }).filter(c=>!Number.isNaN(c[0])&&!Number.isNaN(c[1])); }
+function kmlGeoms(el, acc){
+  for(const c of el.children){
+    const n = c.localName;
+    if(n==='Point'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length) acc.push({type:'Point',coordinates:k[0]}); }
+    else if(n==='LineString'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length>1) acc.push({type:'LineString',coordinates:k}); }
+    else if(n==='LinearRing'){ const k=kmlCoords(kid(c,'coordinates')?.textContent); if(k.length>3) acc.push({type:'Polygon',coordinates:[k]}); }
+    else if(n==='Polygon'){
+      const ob = kid(c,'outerBoundaryIs'), rings=[];
+      if(ob){ const lr=kid(ob,'LinearRing'); if(lr) rings.push(kmlCoords(kid(lr,'coordinates')?.textContent)); }
+      for(const ib of kids(c,'innerBoundaryIs')) for(const lr of kids(ib,'LinearRing')) rings.push(kmlCoords(kid(lr,'coordinates')?.textContent));
+      if(rings.length && rings[0].length>3) acc.push({type:'Polygon',coordinates:rings.filter(r=>r.length>3)});
+    }
+    else if(n==='MultiGeometry') kmlGeoms(c, acc);
+  }
+  return acc;
+}
+function mergeGeoms(list){ // agrupa por clase; devuelve 1..3 geometrías
+  const by = {point:[], line:[], poly:[]};
+  for(const g of list) by[CLASS[g.type]].push(g);
+  const out=[];
+  if(by.point.length) out.push(by.point.length===1?by.point[0]:{type:'MultiPoint',coordinates:by.point.map(g=>g.coordinates)});
+  if(by.line.length) out.push(by.line.length===1?by.line[0]:{type:'MultiLineString',coordinates:by.line.map(g=>g.coordinates)});
+  if(by.poly.length) out.push(by.poly.length===1?by.poly[0]:{type:'MultiPolygon',coordinates:by.poly.map(g=>g.coordinates)});
+  return out;
+}
+function readKml(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('El KML no es un XML válido.');
+  const feats=[], order=['nombre','descripcion'];
+  let skipped = 0;
+  for(const pm of desc(doc,'Placemark')){
+    const p = {nombre: kid(pm,'name')?.textContent.trim() ?? '', descripcion: (kid(pm,'description')?.textContent||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()};
+    const folders=[]; let par=pm.parentElement;
+    while(par){ if(par.localName==='Folder'){ const nm=kid(par,'name')?.textContent.trim(); if(nm) folders.unshift(nm); } par=par.parentElement; }
+    if(folders.length) p.carpeta = folders.join(' / ');
+    for(const d of desc(pm,'Data')){ const k=d.getAttribute('name'); if(k) p[k] = kid(d,'value')?.textContent ?? ''; }
+    for(const d of desc(pm,'SimpleData')){ const k=d.getAttribute('name'); if(k) p[k] = d.textContent; }
+    const gs = mergeGeoms(kmlGeoms(pm, []));
+    if(!gs.length){ skipped++; continue; }
+    for(const g of gs) feats.push({g, p:{...p}});
+  }
+  if(feats.some(f=>'carpeta' in f.p)) order.push('carpeta');
+  return {features:feats, order, skipped};
+}
+
+// ---------- GeoJSON ----------
+function readGeoJSON(text){
+  let j; try{ j = JSON.parse(text); }catch(e){ throw new Error('El archivo no es un JSON válido.'); }
+  const feats=[]; let skipped=0;
+  const push = (g, p) => {
+    if(!g){ skipped++; return; }
+    if(g.type==='GeometryCollection'){ for(const gg of mergeGeoms((g.geometries||[]).filter(x=>CLASS[x.type]))) feats.push({g:gg, p:{...p}}); return; }
+    if(CLASS[g.type]) feats.push({g:{type:g.type, coordinates:g.coordinates}, p:{...p}}); else skipped++;
+  };
+  if(j.type==='FeatureCollection') (j.features||[]).forEach(f=>push(f.geometry, f.properties||{}));
+  else if(j.type==='Feature') push(j.geometry, j.properties||{});
+  else push(j, {});
+  for(const f of feats) for(const k in f.p){ const v=f.p[k]; if(v!==null && typeof v==='object') f.p[k]=JSON.stringify(v); }
+  let crsName = j.crs?.properties?.name || null;
+  return {features:feats, skipped, crsName};
+}
+
+// ---------- GPX ----------
+function readGpx(text){
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if(doc.getElementsByTagName('parsererror').length) throw new Error('El GPX no es un XML válido.');
+  const feats=[], txt=(el,n)=>kid(el,n)?.textContent.trim()??'';
+  const pt = e => { const c=[parseFloat(e.getAttribute('lon')), parseFloat(e.getAttribute('lat'))]; const z=parseFloat(txt(e,'ele')); if(!Number.isNaN(z)) c.push(z); return c; };
+  for(const w of desc(doc,'wpt')) feats.push({g:{type:'Point',coordinates:pt(w)}, p:{nombre:txt(w,'name'), descripcion:txt(w,'desc'), tipo:'waypoint', fecha:txt(w,'time')}});
+  for(const r of desc(doc,'rte')){ const c=kids(r,'rtept').map(pt); if(c.length>1) feats.push({g:{type:'LineString',coordinates:c}, p:{nombre:txt(r,'name'), descripcion:txt(r,'desc'), tipo:'ruta', fecha:''}}); }
+  for(const t of desc(doc,'trk')){
+    const segs = kids(t,'trkseg').map(s=>kids(s,'trkpt').map(pt)).filter(s=>s.length>1);
+    if(!segs.length) continue;
+    feats.push({g: segs.length===1?{type:'LineString',coordinates:segs[0]}:{type:'MultiLineString',coordinates:segs}, p:{nombre:txt(t,'name'), descripcion:txt(t,'desc'), tipo:'track', fecha:''}});
+  }
+  return {features:feats, order:['nombre','descripcion','tipo','fecha']};
+}
+
+// ---------- CSV / TXT ----------
+function parseDelim(text, d){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; continue; }
+    if(ch==='"') q=true;
+    else if(ch===d){ row.push(cur); cur=''; }
+    else if(ch==='\n'||ch==='\r'){ if(ch==='\r'&&text[i+1]==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+    else cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+function parseWKT(s){
+  const m = /^\s*(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON)\s*(Z|M|ZM)?\s*(\(.*\))\s*$/i.exec(s||'');
+  if(!m) return null;
+  const type = {POINT:'Point',LINESTRING:'LineString',POLYGON:'Polygon',MULTIPOINT:'MultiPoint',MULTILINESTRING:'MultiLineString',MULTIPOLYGON:'MultiPolygon'}[m[1].toUpperCase()];
+  let body = m[3].replace(/(-?[\d.]+(?:[eE][-+]?\d+)?)((?:\s+-?[\d.]+(?:[eE][-+]?\d+)?)+)/g, t=>'['+t.trim().split(/\s+/).slice(0,m[2]&&m[2].toUpperCase()==='M'?2:3).join(',')+']')
+    .replace(/\(/g,'[').replace(/\)/g,']');
+  let c; try{ c = JSON.parse(body); }catch(e){ return null; }
+  if(type==='Point') c = c[0];
+  if(type==='MultiPoint') c = c.map(x=>Array.isArray(x[0])?x[0]:x);
+  return {type, coordinates:c};
+}
+function readCsv(text){
+  const first = text.split(/\r?\n/).find(l=>l.trim())||'';
+  const cands = [',',';','\t','|'];
+  const d = cands.map(c=>[c, first.split(c).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows = parseDelim(text.replace(/^﻿/,''), d);
+  if(rows.length<2) throw new Error('El CSV necesita una fila de encabezado y al menos un registro.');
+  const head = rows[0].map(h=>h.trim());
+  const find = re => head.findIndex(h=>re.test(h.normalize('NFD').replace(/[̀-ͯ]/g,'')));
+  const iW = find(/^(wkt|geom|geometry|geometria|the_geom|shape)$/i);
+  const iX = find(/^(x|este|east|easting|e|lon|long|longitud|longitude|lng|coord_?x)$/i);
+  const iY = find(/^(y|norte|north|northing|n|lat|latitud|latitude|coord_?y)$/i);
+  const iZ = find(/^(z|cota|elev|elevacion|elevation|altura|h|alt|altitud)$/i);
+  if(iW<0 && (iX<0||iY<0)) throw new Error('No se encontraron columnas de coordenadas. Use encabezados como X/Y, Este/Norte, Lon/Lat o una columna WKT.');
+  const num = s => { s=(s||'').trim(); if(d!==',' && /^-?\d+,\d+$/.test(s)) s=s.replace(',','.'); return s===''?NaN:Number(s); };
+  const skip = new Set([iW,iX,iY,iZ].filter(i=>i>=0));
+  const order = head.filter((_,i)=>!skip.has(i));
+  const feats=[]; let bad=0;
+  for(const r of rows.slice(1)){
+    let g=null;
+    if(iW>=0) g = parseWKT(r[iW]);
+    else { const x=num(r[iX]), y=num(r[iY]); if(Number.isFinite(x)&&Number.isFinite(y)){ const c=[x,y]; if(iZ>=0){ const z=num(r[iZ]); if(Number.isFinite(z)) c.push(z); } g={type:'Point',coordinates:c}; } }
+    if(!g){ bad++; continue; }
+    const p={}; head.forEach((h,i)=>{ if(!skip.has(i)){ const v=(r[i]??'').trim(); const n=num(v); p[h] = (v!=='' && Number.isFinite(n) && /^-?[\d.,]+([eE][-+]?\d+)?$/.test(v)) ? n : v; } });
+    feats.push({g, p});
+  }
+  return {features:feats, order, skipped:bad, cols:{x:head[iX], y:head[iY], z:iZ>=0?head[iZ]:null, wkt:iW>=0?head[iW]:null}};
+}
+
+// ---------- DXF (ASCII) ----------
+function readDxf(u8){
+  const head = decodeText(u8.subarray(0,Math.min(22,u8.length)),'windows-1252');
+  if(head.startsWith('AutoCAD Binary DXF')) throw new Error('Es un DXF binario. Guárdelo como DXF ASCII y vuelva a intentarlo.');
+  let text = decodeText(u8, null);
+  const L = text.split(/\r?\n/);
+  const pairs=[]; for(let i=0;i+1<L.length;i+=2) pairs.push([parseInt(L[i],10), L[i+1]]);
+  let i = pairs.findIndex((p,k)=>p[0]===0&&p[1].trim()==='SECTION'&&pairs[k+1]&&pairs[k+1][1].trim()==='ENTITIES');
+  if(i<0) throw new Error('No se encontró la sección ENTITIES del DXF.');
+  i += 2;
+  const ents=[];
+  while(i<pairs.length){
+    if(pairs[i][0]===0){ const t=pairs[i][1].trim(); if(t==='ENDSEC') break; const e={t, c:[]}; i++;
+      while(i<pairs.length && pairs[i][0]!==0){ e.c.push(pairs[i]); i++; } ents.push(e); }
+    else i++;
+  }
+  const feats=[], unsup={}; let bulge=false;
+  const g1 = (e,code) => { const p=e.c.find(x=>x[0]===code); return p?p[1]:undefined; };
+  const gn = (e,code,def) => { const v=g1(e,code); const n=parseFloat(v); return Number.isFinite(n)?n:def; };
+  for(let k=0;k<ents.length;k++){
+    const e = ents[k], layer = (g1(e,8)||'0').trim();
+    const P = (x,y,z)=> (z!==undefined && z!==0 ? [x,y,z] : [x,y]);
+    if(e.t==='POINT') feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:'POINT', texto:''}});
+    else if(e.t==='TEXT'||e.t==='MTEXT'){
+      let s = e.c.filter(x=>x[0]===3).map(x=>x[1]).join('') + (g1(e,1)||'');
+      s = s.replace(/\\P/g,' ').replace(/\\[A-Za-z][^;]*;/g,'').replace(/[{}]/g,'').trim();
+      feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:e.t, texto:s}});
+    }
+    else if(e.t==='INSERT') feats.push({g:{type:'Point',coordinates:P(gn(e,10,0),gn(e,20,0),gn(e,30,0))}, p:{capa:layer, entidad:'INSERT', texto:(g1(e,2)||'').trim()}});
+    else if(e.t==='LINE') feats.push({g:{type:'LineString',coordinates:[P(gn(e,10,0),gn(e,20,0),gn(e,30,0)), P(gn(e,11,0),gn(e,21,0),gn(e,31,0))]}, p:{capa:layer, entidad:'LINE', texto:''}});
+    else if(e.t==='LWPOLYLINE'){
+      const closed = (gn(e,70,0)&1)===1, el = gn(e,38,0), pts=[];
+      let cur=null;
+      for(const [c,v] of e.c){ if(c===10){ cur=[parseFloat(v)]; pts.push(cur); } else if(c===20&&cur) cur.push(parseFloat(v)); else if(c===42 && parseFloat(v)!==0) bulge=true; }
+      const cs = pts.filter(p=>p.length===2).map(p=>P(p[0],p[1],el));
+      pushPath(feats, cs, closed, {capa:layer, entidad:'LWPOLYLINE', texto:''});
+    }
+    else if(e.t==='POLYLINE'){
+      const fl = gn(e,70,0), closed=(fl&1)===1, cs=[];
+      k++;
+      while(k<ents.length && ents[k].t!=='SEQEND'){ const v=ents[k]; if(v.t==='VERTEX'){ if(gn(v,42,0)!==0) bulge=true; cs.push(P(gn(v,10,0),gn(v,20,0),gn(v,30,0))); } k++; }
+      if(fl&(16|64)){ unsup['POLYLINE (malla)']=(unsup['POLYLINE (malla)']||0)+1; continue; }
+      pushPath(feats, cs, closed, {capa:layer, entidad:'POLYLINE', texto:''});
+    }
+    else if(e.t!=='SEQEND' && e.t!=='VERTEX' && e.t!=='ATTRIB') unsup[e.t]=(unsup[e.t]||0)+1;
+  }
+  return {features:feats, order:['capa','entidad','texto'], unsup, bulge};
+}
+function pushPath(feats, cs, closed, p){
+  if(cs.length<2) return;
+  if(closed && cs.length>=3){ const r=cs.slice(); const a=r[0], b=r[r.length-1]; if(a[0]!==b[0]||a[1]!==b[1]) r.push(a.slice()); feats.push({g:{type:'Polygon',coordinates:[r]}, p}); }
+  else feats.push({g:{type:'LineString',coordinates:cs}, p});
+}
+
+/* ---------- Detección del sistema ---------- */
+function crsFromWkt(w, sampleN, sampleLon){
+  const W = (w||'').toUpperCase().replace(/\s+/g,' ');
+  let fam = null;
+  if(/PROVISIONAL_S_AMERICAN|PSAD|LA_CANOA|LA CANOA/.test(W)) fam='PSAD';
+  else if(/REGVEN/.test(W)) fam='REGVEN';
+  else if(/SIRGAS/.test(W)) fam='SIRGAS';
+  else if(/WGS_1984|WGS 84|WGS84|WGS_84/.test(W)) fam='WGS84';
+  if(!fam) return null;
+  const num = re => { const m = re.exec(W); return m?parseFloat(m[1]):null; };
+  const isProj = /PROJCS|PROJCRS/.test(W);
+  let type='geo', zone=null, south=false;
+  if(isProj){
+    const cm = num(/CENTRAL_MERIDIAN"?\s*,\s*(-?[\d.]+)/), fn = num(/FALSE_NORTHING"?\s*,\s*(-?[\d.]+)/), fe = num(/FALSE_EASTING"?\s*,\s*(-?[\d.]+)/);
+    if(!/TRANSVERSE_MERCATOR/.test(W) || cm===null || Math.abs(((cm+183)/6)-Math.round((cm+183)/6))>1e-9 || (fe!==null && Math.abs(fe-500000)>1e-6)) return {unsupported:true, fam};
+    type='utm'; zone=Math.round((cm+183)/6); south=(fn||0)>=5e6;
+  }
+  const zs = zone ? zone+(south?'S':'N') : null;
+  let datum;
+  if(fam==='WGS84') datum='WGS84';
+  else if(fam==='PSAD'){
+    if(type==='geo') datum = sampleLon!==null && sampleLon < -74.4 ? 'PSADEC' : 'CANOA';
+    else if(south || zone===17) datum='PSADEC';
+    else if(zone===19||zone===20) datum='CANOA';
+    else datum = (sampleN!==null && sampleN>300000) ? 'CANOA' : 'PSADEC';
+  } else {
+    if(type==='geo') datum = sampleLon!==null && sampleLon < -74.4 ? 'SIRGAS' : (fam==='REGVEN'?'REGVEN':'REGVEN');
+    else if(south || zone<=17) datum='SIRGAS';
+    else if(zone>=19) datum='REGVEN';
+    else datum = (sampleN!==null && sampleN>300000) ? 'REGVEN' : 'SIRGAS';
+    if(type==='geo' && fam==='SIRGAS' && sampleLon!==null && sampleLon < -74.4) datum='SIRGAS';
+  }
+  const id = type==='geo' ? datum+':geo' : datum+':'+zs;
+  if(type==='utm' && !ZONES[datum].includes(zs)) return {id:'WGS84:'+zs, approx:true, fam};
+  return {id};
+}
+function detectCRS(d){
+  if(d.forcedWgs) return {id:'WGS84:geo', how:'formato', sure:true, note:`El formato ${d.fmtName} se define siempre en WGS 84 geográficas.`};
+  let xs=0, ys=0, n=0, allGeo=true, maxY=-Infinity, minY=Infinity;
+  for(const f of d.features) eachCoord(f.g, c=>{ if(n<20000){ xs+=c[0]; ys+=c[1]; n++; } if(Math.abs(c[0])>180||Math.abs(c[1])>90) allGeo=false; maxY=Math.max(maxY,c[1]); minY=Math.min(minY,c[1]); });
+  const mx = n?xs/n:0, my = n?ys/n:0;
+  if(d.prj){
+    const r = crsFromWkt(d.prj, allGeo?null:my, allGeo?mx:null);
+    if(r && r.id) return {id:r.id, how:'prj', sure:!r.approx, note: r.approx ? 'El .prj declara un sistema fuera del catálogo; se asignó el equivalente WGS 84 de la misma zona.' : 'Sistema leído del archivo .prj.'};
+    if(r && r.unsupported) return {id:null, how:'prj', sure:false, note:'El .prj declara una proyección distinta de UTM; seleccione el origen manualmente.'};
+  }
+  if(d.crsName){
+    const m = /EPSG:{1,2}(\d+)|CRS84/i.exec(d.crsName);
+    if(m){ const code = m[1]?parseInt(m[1],10):4326;
+      const hit = Object.entries(EPSG).find(([k,v])=>v===code);
+      if(code===4326) return {id:'WGS84:geo', how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'};
+      if(hit){ const [dt,z]=hit[0].split(':'); return {id: z==='geo'?dt+':geo':dt+':'+z, how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'}; }
+      if(code>=32601&&code<=32760){ const z=(code%100)+(code>32700?'S':'N'); if(ZONES.WGS84.includes(z)) return {id:'WGS84:'+z, how:'crs', sure:true, note:'Sistema declarado en el GeoJSON.'}; }
+    }
+  }
+  if(d.kind==='geojson' && allGeo) return {id:'WGS84:geo', how:'formato', sure:true, note:'GeoJSON (RFC 7946) se define en WGS 84 geográficas.'};
+  if(allGeo){
+    const id = inBox(BOX.VE,my,mx) ? 'REGVEN:geo' : (inBox(BOX.EC,my,mx)||inBox(BOX.GAL,my,mx)) ? 'SIRGAS:geo' : 'WGS84:geo';
+    return {id, how:'rango', sure:false, note:'Coordenadas geográficas sin sistema declarado: se asumió el marco SIRGAS del país. Confirme el datum.'};
+  }
+  if(minY>=9.3e6) return {id:'SIRGAS:17S', how:'rango', sure:false, note:'Sin sistema declarado. Norte mayor a 9 300 000 m sugiere UTM sur en Ecuador; se asumió SIRGAS-ECU 17S (oficial). Confirme la zona (15S/16S en Galápagos, 18S) y el datum.'};
+  if(maxY<200000) return {id:'SIRGAS:17N', how:'rango', sure:false, note:'Sin sistema declarado. Norte menor a 200 000 m sugiere UTM norte cerca del ecuador (norte de Ecuador o sur de Venezuela). Se asumió SIRGAS-ECU 17N: confirme zona y datum.'};
+  return {id:'REGVEN:19N', how:'rango', sure:false, note:'Sin sistema declarado. El rango sugiere UTM norte en Venezuela; se asumió REGVEN 19N. Confirme zona y datum en el mapa.'};
+}
+
+/* ---------- Carga de archivos ---------- */
+async function loadFiles(fileList){
+  const files = Array.from(fileList);
+  clearMsgs('loadMsgs');
+  if(!files.length) return;
+  try{
+    const entries = []; // {name, buf}
+    for(const f of files){
+      const e = extOf(f.name);
+      if(e==='zip' || e==='kmz'){
+        if(typeof JSZip==='undefined') throw new Error('No se pudo cargar la librería JSZip. Revise la conexión a internet.');
+        const z = await JSZip.loadAsync(await f.arrayBuffer());
+        for(const zf of Object.values(z.files)){ if(zf.dir || /__MACOSX|\/\._/.test(zf.name)) continue; entries.push({name:zf.name, buf:await zf.async('arraybuffer'), from:f.name}); }
+      } else entries.push({name:f.name, buf:await f.arrayBuffer()});
+    }
+    const by = ext => entries.filter(x=>extOf(x.name)===ext);
+    let d;
+    const shps = by('shp');
+    if(shps.length){
+      d = {kind:'shp', fmtName:'Shapefile', name: shps.length===1?baseOf(shps[0].name):baseOf(files[0].name), features:[], order:[], notes:[]};
+      for(const s of shps){
+        const b = baseOf(s.name).toLowerCase();
+        const mate = ext => entries.find(x=>extOf(x.name)===ext && baseOf(x.name).toLowerCase()===b);
+        const dbf = mate('dbf'), prj = mate('prj'), cpg = mate('cpg');
+        const geoms = readShp(s.buf);
+        let rows = [], fields=[];
+        if(dbf){ const r = readDbf(dbf.buf, cpg?cpgToLabel(decodeText(new Uint8Array(cpg.buf))):null); rows=r.rows; fields=r.fields.map(f=>f.name);
+          d.notes.push(`${baseOf(s.name)}: atributos leídos en ${r.enc.toUpperCase()}${cpg?' (según .cpg)':' (detectado)'}.`); }
+        else d.notes.push(`${baseOf(s.name)}: falta el .dbf; se carga solo la geometría.`);
+        if(prj && !d.prj) d.prj = decodeText(new Uint8Array(prj.buf));
+        let nulls=0, uns=0;
+        geoms.forEach((g,i)=>{ if(rows[i]===null) return; if(!g){ nulls++; return; } if(g.unsupported){ uns++; return; }
+          const p = {...(rows[i]||{})}; if(shps.length>1) p.capa_origen = baseOf(s.name); d.features.push({g,p}); });
+        if(nulls) d.notes.push(`${baseOf(s.name)}: ${nulls} registro(s) sin geometría omitido(s).`);
+        if(uns) d.notes.push(`${baseOf(s.name)}: ${uns} registro(s) de tipo no compatible (MultiPatch) omitido(s).`);
+        d.order.push(...fields.filter(x=>!d.order.includes(x)));
+      }
+      if(shps.length>1){ d.order.push('capa_origen'); d.notes.push(`Se combinaron ${shps.length} capas; el campo capa_origen indica la capa de cada elemento.`); }
+    } else {
+      const pick = entries.find(x=>['kml','geojson','json','gpx','csv','txt','dxf'].includes(extOf(x.name)));
+      if(!pick) throw new Error('No se reconoció ningún formato compatible en lo cargado.');
+      const e = extOf(pick.name), u8 = new Uint8Array(pick.buf);
+      const fromKmz = files.some(f=>extOf(f.name)==='kmz');
+      if(e==='kml'){ const r=readKml(decodeText(u8,null)); d={kind:'kml', fmtName: fromKmz?'KMZ':'KML', forcedWgs:true, ...r}; if(r.skipped) d.notes=[`${r.skipped} elemento(s) sin geometría compatible omitido(s) (modelos 3D, superposiciones, tracks gx).`]; }
+      else if(e==='geojson'||e==='json'){ const r=readGeoJSON(decodeText(u8,'utf-8')); d={kind:'geojson', fmtName:'GeoJSON', ...r}; if(r.skipped) d.notes=[`${r.skipped} elemento(s) sin geometría omitido(s).`]; }
+      else if(e==='gpx'){ d={kind:'gpx', fmtName:'GPX', forcedWgs:true, ...readGpx(decodeText(u8,'utf-8'))}; }
+      else if(e==='csv'||e==='txt'){ const r=readCsv(decodeText(u8,null)); d={kind:'csv', fmtName:'CSV', ...r};
+        d.notes=[r.cols.wkt?`Geometría leída de la columna WKT «${r.cols.wkt}».`:`Coordenadas leídas de «${r.cols.x}» y «${r.cols.y}»${r.cols.z?` y cota de «${r.cols.z}»`:''}.`];
+        if(r.skipped) d.notes.push(`${r.skipped} fila(s) sin coordenadas válidas omitida(s).`); }
+      else if(e==='dxf'){ const r=readDxf(u8); d={kind:'dxf', fmtName:'DXF', ...r, notes:[]};
+        const u = Object.entries(r.unsup).map(([k,v])=>`${k} (${v})`).join(', ');
+        if(u) d.notes.push(`Entidades no convertidas: ${u}. Solo se leen puntos, textos, bloques (como puntos), líneas y polilíneas.`);
+        if(r.bulge) d.notes.push('Hay polilíneas con arcos (bulge): se convierten como segmentos rectos entre vértices.');
+        d.notes.push('El DXF no guarda sistema de coordenadas: confirme el origen.'); }
+      d.name = baseOf(fromKmz ? files.find(f=>extOf(f.name)==='kmz').name : pick.name);
+      d.notes = d.notes || [];
+    }
+    if(!d.features.length) throw new Error('El archivo no contiene elementos con geometría compatible.');
+    d.fields = fieldsOf(d.features, d.order);
+    setData(d);
+  }catch(err){
+    addMsg('loadMsgs', 'err', err.message || String(err));
+  }
+}
+
+/* =====================================================================
+   PLAN DE TRANSFORMACIÓN
+   ===================================================================== */
+function srcToGeo(c, src){
+  if(src.type==='geo') return [c[1], c[0]];
+  return utmInv(c[0], c[1], src.zone, src.south, ELL[DATUM[src.datum].ell]);
+}
+function computePivot(){
+  const d = S.data, src = crsParse(S.srcId);
+  let bad = 0, minLat=Infinity, maxLat=-Infinity, minLon=Infinity, maxLon=-Infinity, gal=0, n=0, sLat=0, sLon=0;
+  const feats = d.features.map(f=>({g:mapGeom(f.g, c=>{
+    const [la0,lo0] = srcToGeo(c, src);
+    if(!Number.isFinite(la0)||!Number.isFinite(lo0)||Math.abs(la0)>90){ bad++; return [0,0]; }
+    const [la,lo] = toPivot(src.datum, la0, lo0);
+    minLat=Math.min(minLat,la); maxLat=Math.max(maxLat,la); minLon=Math.min(minLon,lo); maxLon=Math.max(maxLon,lo);
+    if(inBox(BOX.GAL,la,lo)) gal++; n++; sLat+=la; sLon+=lo;
+    return c.length>2 ? [lo,la,c[2]] : [lo,la];
+  }), p:f.p}));
+  S.piv = {features:feats, bbox:[minLon,minLat,maxLon,maxLat], bad, gal, n, cLat:sLat/Math.max(n,1), cLon:sLon/Math.max(n,1)};
+}
+function autoZone(datum, lat, lon){
+  let z = Math.floor((lon+180)/6)+1;
+  const allowed = ZONES[datum].map(s=>parseInt(s,10));
+  const zmin = Math.min(...allowed), zmax = Math.max(...allowed);
+  let clamped = false;
+  if(z<zmin){ z=zmin; clamped=true; } if(z>zmax){ z=zmax; clamped=true; }
+  let zs = z+(lat<0?'S':'N');
+  if(!ZONES[datum].includes(zs)){ const alt = z+(lat<0?'N':'S'); if(ZONES[datum].includes(alt)){ zs=alt; clamped=true; } }
+  return {zs, clamped};
+}
+function makePlan(){
+  const msgs = [];
+  const d = S.data, src = crsParse(S.srcId), P = S.piv;
+  let dst = crsParse(S.dstId);
+  const fmt = S.fmt;
+  if(['kml','kmz','gpx'].includes(fmt) && S.dstId!=='WGS84:geo'){ dst = crsParse('WGS84:geo'); }
+  if(P.bad) msgs.push(['err', `${P.bad} vértice(s) no se pudieron convertir con el sistema de origen elegido. Revise la zona UTM y el hemisferio.`]);
+  const [x0,y0,x1,y1] = P.bbox;
+  // Validez regional de los datums locales
+  for(const [dt, role] of [[src.datum,'origen'],[dst.datum,'destino']]){
+    if(dt==='PSADEC'){
+      if(P.gal) msgs.push(['err', `PSAD56 no está definido en Galápagos y los parámetros del IGM solo cubren Ecuador continental. ${P.gal} vértice(s) del archivo están en el archipiélago: use WGS 84 o SIRGAS-ECU (UTM 15S/16S/15N/16N) como ${role}.`]);
+      else if(!(x0>=BOX.EC.lonMin && x1<=BOX.EC.lonMax && y0>=BOX.EC.latMin && y1<=BOX.EC.latMax)) msgs.push(['err', `Los parámetros PSAD56 → SIRGAS del IGM solo son válidos en Ecuador continental, y los datos (${role}) quedan fuera de esa área.`]);
+    }
+    if(dt==='CANOA' && !(x0>=BOX.VE.lonMin && x1<=BOX.VE.lonMax && y0>=BOX.VE.latMin && y1<=BOX.VE.latMax))
+      msgs.push(['err', `PATVEN-98 solo es válido en Venezuela, y los datos (${role}) quedan fuera de esa área.`]);
+  }
+  // Zona automática
+  let autoInfo = null;
+  if(dst.type==='auto'){
+    const {zs, clamped} = autoZone(dst.datum, P.cLat, P.cLon);
+    autoInfo = {zs, clamped};
+    dst = crsParse(dst.datum+':'+zs);
+    if(clamped) msgs.push(['warn', `La zona calculada por longitud no existe para ${SHORT[dst.datum]}; se usó la más cercana, UTM ${zs}.`]);
+  }
+  if(dst.type==='utm'){
+    const z0 = Math.floor((x0+180)/6)+1, z1 = Math.floor((x1+180)/6)+1;
+    if(z0!==z1) msgs.push(['warn', `Los datos abarcan las zonas ${z0} a ${z1}. Todo el archivo se expresa en UTM ${dst.zs}, como zona extendida.`]);
+    let kmax = 0, dl = 0;
+    for(const f of P.features) eachCoord(f.g, c=>{ const k=scaleK(c[1],c[0],dst.zone); if(k>kmax) kmax=k; dl=Math.max(dl,Math.abs(c[0]-cmOf(dst.zone))); });
+    if(dl>3.0001) msgs.push(['warn', `Hay vértices a ${dl.toFixed(2)}° del meridiano central (${cmOf(dst.zone)}°). Factor de escala máximo ≈ ${kmax.toFixed(5)} (${((kmax-1)*1000).toFixed(2)} mm/m): las distancias medidas en planta difieren de las reales.`]);
+    if(dst.south && y1>0) msgs.push(['info', `Hay vértices al norte del ecuador expresados en UTM ${dst.zs}: sus coordenadas Norte superan 10 000 000 m. Es correcto en esa zona.`]);
+    if(!dst.south && y0<0) msgs.push(['info', `Hay vértices al sur del ecuador expresados en UTM ${dst.zs}: sus coordenadas Norte son negativas.`]);
+    if(y0<0 && y1>0) msgs.push(['info', 'Los datos cruzan el ecuador; se usó un solo hemisferio para todo el archivo.']);
+  }
+  // Operación
+  const op = describeOp(src.datum, dst.datum);
+  return {src, dst, autoInfo, op, msgs, blocked: msgs.some(m=>m[0]==='err')};
+}
+function describeOp(a, b){
+  const local = x => x==='CANOA'||x==='PSADEC';
+  const PAT = 'PATVEN-98 (IGVSB/LGFS) · Molodensky-Badekas, 10 parámetros con punto fundamental La Canoa · Coordinate Frame';
+  const PATp = 'tX −270,933 m · tY +115,599 m · tZ −360,226 m · rX −5,266″ · rY −1,238″ · rZ +2,381″ · ΔS −5,109 ppm · PF (2 464 351,59; −5 783 466,61; 974 809,81)';
+  const IGM = 'IGM Ecuador (EPSG 3971/3990) · Coordinate Frame, 7 parámetros · exactitud ±5 m · escalas 1:25 000 y menores';
+  const IGMp = 'tX −60,310 m · tY +245,935 m · tZ +31,008 m · rX −12,324″ · rY −3,755″ · rZ +7,370″ · ΔS +0,447 ppm';
+  const part = x => x==='CANOA' ? [PAT,PATp] : [IGM,IGMp];
+  if(a===b) return {title:'Sin cambio de datum', lines:['Solo cambia la representación (geográficas ⇄ UTM o zona UTM).']};
+  if(!local(a) && !local(b)) return {title:'Sin transformación de datum', lines:[`${SHORT[a]} y ${SHORT[b]} se consideran equivalentes (diferencias del orden del metro o menores). No se modelan los cambios entre épocas de referencia.`]};
+  if(local(a) && local(b)) return {title:'Doble transformación vía SIRGAS', lines:[`${SHORT[a]} → SIRGAS: ${part(a)[0]}`, `SIRGAS → ${SHORT[b]}: ${part(b)[0]} (inversa)`], params:[part(a)[1], part(b)[1]]};
+  const l = local(a) ? a : b, dir = local(a) ? 'directa' : 'inversa';
+  return {title:`${SHORT[a]} → ${SHORT[b]}`, lines:[`${part(l)[0]} · operación ${dir}`], params:[part(l)[1]]};
+}
+function makeTransformer(plan){
+  const {src, dst} = plan, eS = ELL[DATUM[src.datum].ell], eD = ELL[DATUM[dst.datum].ell];
+  const same = src.datum===dst.datum || (!['CANOA','PSADEC'].includes(src.datum) && !['CANOA','PSADEC'].includes(dst.datum));
+  return c => {
+    let [la, lo] = src.type==='geo' ? [c[1], c[0]] : utmInv(c[0], c[1], src.zone, src.south, eS);
+    if(!same){ [la, lo] = toPivot(src.datum, la, lo); [la, lo] = fromPivot(dst.datum, la, lo); }
+    const o = dst.type==='geo' ? [r9(lo), r9(la)] : utmFwd(la, lo, dst.zone, dst.south, eD).map(r4);
+    if(c.length>2) o.push(c[2]);
+    return o;
+  };
+}
+const r9 = v => Math.round(v*1e9)/1e9, r4 = v => Math.round(v*1e4)/1e4;
+
+/* =====================================================================
+   ESCRITORES
+   ===================================================================== */
+const enc8 = new TextEncoder();
+function sanitizeFields(fields){
+  const used = new Set(), map = {};
+  for(const f of fields){
+    let b = f.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_]/g,'_').replace(/^_+/,'') || 'CAMPO';
+    if(/^\d/.test(b)) b = 'F'+b;
+    let n = b.slice(0,10), i = 1;
+    while(used.has(n.toUpperCase())){ const s='_'+(i++); n = b.slice(0,10-s.length)+s; }
+    used.add(n.toUpperCase()); map[f] = n;
+  }
+  return map;
+}
+function writeDbf(features, fields){
+  const names = sanitizeFields(fields), defs = [], warns = [];
+  for(const f of fields){
+    const vals = features.map(x=>x.p[f]).filter(v=>v!==null && v!==undefined && v!=='');
+    let type='C', len=1, dec=0;
+    if(vals.length && vals.every(v=>typeof v==='boolean')){ type='L'; len=1; }
+    else if(vals.length && vals.every(v=>typeof v==='number' && Number.isFinite(v))){
+      dec = Math.min(8, Math.max(0, ...vals.map(v=>{ const s=String(v); if(/e/i.test(s)) return 8; const k=s.indexOf('.'); return k<0?0:s.length-k-1; })));
+      len = Math.max(...vals.map(v=>v.toFixed(dec).length), 1);
+      if(len>19){ type='C'; } else { type='N'; len=Math.max(len, dec?dec+2:1); }
+    }
+    if(type==='C'){ len = Math.max(1, ...vals.map(v=>enc8.encode(String(v)).length)); if(len>254){ warns.push(`El campo «${f}» tiene textos de más de 254 bytes: se truncan.`); len=254; } }
+    defs.push({src:f, name:names[f], type, len, dec});
+  }
+  const rl = 1 + defs.reduce((s,d)=>s+d.len,0), hl = 32 + 32*defs.length + 1, n = features.length;
+  const buf = new ArrayBuffer(hl + rl*n + 1), dv = new DataView(buf), u8 = new Uint8Array(buf);
+  const now = new Date();
+  dv.setUint8(0,0x03); dv.setUint8(1,now.getFullYear()-1900); dv.setUint8(2,now.getMonth()+1); dv.setUint8(3,now.getDate());
+  dv.setUint32(4,n,true); dv.setUint16(8,hl,true); dv.setUint16(10,rl,true); dv.setUint8(29,0x00);
+  defs.forEach((d,i)=>{ const o=32+32*i; for(let k=0;k<d.name.length;k++) u8[o+k]=d.name.charCodeAt(k); u8[o+11]=d.type.charCodeAt(0); u8[o+16]=d.len; u8[o+17]=d.dec; });
+  u8[hl-1] = 0x0D;
+  features.forEach((ft,r)=>{
+    let o = hl + r*rl; u8[o++] = 0x20;
+    for(const d of defs){
+      const v = ft.p[d.src]; let bytes;
+      if(d.type==='N'){ const s = (v===null||v===undefined||v===''||!Number.isFinite(Number(v))) ? '' : Number(v).toFixed(d.dec); bytes = enc8.encode(s.padStart(d.len,' ').slice(-d.len)); }
+      else if(d.type==='L'){ bytes = enc8.encode(v===true?'T':v===false?'F':'?'); }
+      else { let b = enc8.encode(v===null||v===undefined?'':String(v)); if(b.length>d.len){ b=b.slice(0,d.len); while(b.length && (b[b.length-1]&0xC0)===0x80) b=b.slice(0,-1); if(b.length && b[b.length-1]>=0xC0) b=b.slice(0,-1); } bytes = new Uint8Array(d.len).fill(0x20); bytes.set(b); }
+      u8.set(bytes.subarray(0,d.len), o); o += d.len;
+    }
+  });
+  u8[buf.byteLength-1] = 0x1A;
+  const renamed = defs.filter(d=>d.name!==d.src).map(d=>`${d.src} → ${d.name}`);
+  return {buf, renamed, warns};
+}
+function writeShpLayer(features, cls){
+  const hasZ = features.some(f=>{ let z=false; eachCoord(f.g,c=>{ if(c.length>2) z=true; }); return z; });
+  const multiPt = cls==='point' && features.some(f=>f.g.type==='MultiPoint');
+  const type = cls==='point' ? (multiPt ? (hasZ?18:8) : (hasZ?11:1)) : cls==='line' ? (hasZ?13:3) : (hasZ?15:5);
+  const recs = [];
+  let bb=[Infinity,Infinity,-Infinity,-Infinity], zb=[Infinity,-Infinity];
+  const ext = c => { bb[0]=Math.min(bb[0],c[0]); bb[1]=Math.min(bb[1],c[1]); bb[2]=Math.max(bb[2],c[0]); bb[3]=Math.max(bb[3],c[1]); const z=c[2]??0; zb[0]=Math.min(zb[0],z); zb[1]=Math.max(zb[1],z); };
+  for(const f of features){
+    let parts;
+    const g = f.g;
+    if(cls==='point') parts = [g.type==='Point'?[g.coordinates]:g.coordinates];
+    else if(cls==='line') parts = g.type==='LineString'?[g.coordinates]:g.coordinates;
+    else { const polys = g.type==='Polygon'?[g.coordinates]:g.coordinates; parts=[];
+      for(const poly of polys) poly.forEach((ring,i)=>{ const r=ring.slice(); const a=r[0],b=r[r.length-1]; if(a[0]!==b[0]||a[1]!==b[1]) r.push(a.slice());
+        const cw = ringArea(r)<0; if((i===0)!==cw) r.reverse(); parts.push(r); }); }
+    const pts = parts.flat(); pts.forEach(ext);
+    let cl;
+    if(type===1) cl=20; else if(type===11) cl=36;
+    else if(type===8) cl=40+16*pts.length; else if(type===18) cl=40+16*pts.length+16+8*pts.length;
+    else cl = 44+4*parts.length+16*pts.length + (hasZ?16+8*pts.length:0);
+    const b = new ArrayBuffer(cl), v = new DataView(b);
+    v.setInt32(0,type,true);
+    if(type===1||type===11){ const c=pts[0]; v.setFloat64(4,c[0],true); v.setFloat64(12,c[1],true); if(type===11){ v.setFloat64(20,c[2]??0,true); v.setFloat64(28,0,true); } }
+    else {
+      let rb=[Infinity,Infinity,-Infinity,-Infinity]; pts.forEach(c=>{ rb[0]=Math.min(rb[0],c[0]); rb[1]=Math.min(rb[1],c[1]); rb[2]=Math.max(rb[2],c[0]); rb[3]=Math.max(rb[3],c[1]); });
+      rb.forEach((x,i)=>v.setFloat64(4+8*i,x,true));
+      let o;
+      if(type===8||type===18){ v.setInt32(36,pts.length,true); o=40; }
+      else { v.setInt32(36,parts.length,true); v.setInt32(40,pts.length,true); let s=0; parts.forEach((p,i)=>{ v.setInt32(44+4*i,s,true); s+=p.length; }); o=44+4*parts.length; }
+      pts.forEach(c=>{ v.setFloat64(o,c[0],true); v.setFloat64(o+8,c[1],true); o+=16; });
+      if(hasZ){ const zs=pts.map(c=>c[2]??0); v.setFloat64(o,Math.min(...zs),true); v.setFloat64(o+8,Math.max(...zs),true); o+=16; zs.forEach(z=>{ v.setFloat64(o,z,true); o+=8; }); }
+    }
+    recs.push(b);
+  }
+  const total = 100 + recs.reduce((s,r)=>s+8+r.byteLength,0);
+  const shp = new ArrayBuffer(total), shx = new ArrayBuffer(100+8*recs.length);
+  const hdr = (v, len) => { v.setInt32(0,9994,false); v.setInt32(24,len/2,false); v.setInt32(28,1000,true); v.setInt32(32,type,true);
+    bb.forEach((x,i)=>v.setFloat64(36+8*i, Number.isFinite(x)?x:0, true)); v.setFloat64(68,hasZ&&Number.isFinite(zb[0])?zb[0]:0,true); v.setFloat64(76,hasZ&&Number.isFinite(zb[1])?zb[1]:0,true); };
+  const sv = new DataView(shp), xv = new DataView(shx), su8 = new Uint8Array(shp);
+  hdr(sv,total); hdr(xv,shx.byteLength);
+  let off = 100;
+  recs.forEach((r,i)=>{ sv.setInt32(off,i+1,false); sv.setInt32(off+4,r.byteLength/2,false); su8.set(new Uint8Array(r), off+8);
+    xv.setInt32(100+8*i, off/2, false); xv.setInt32(104+8*i, r.byteLength/2, false); off += 8+r.byteLength; });
+  return {shp, shx, type, hasZ};
+}
+const xmlEsc = s => String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]));
+function writeKml(features, fields, nameField, title){
+  const cc = c => `${c[0]},${c[1]}${c.length>2?','+c[2]:''}`;
+  const ring = r => `<LinearRing><coordinates>${r.map(cc).join(' ')}</coordinates></LinearRing>`;
+  const geom = g => {
+    switch(g.type){
+      case 'Point': return `<Point><coordinates>${cc(g.coordinates)}</coordinates></Point>`;
+      case 'LineString': return `<LineString><tessellate>1</tessellate><coordinates>${g.coordinates.map(cc).join(' ')}</coordinates></LineString>`;
+      case 'Polygon': return `<Polygon><outerBoundaryIs>${ring(g.coordinates[0])}</outerBoundaryIs>${g.coordinates.slice(1).map(r=>`<innerBoundaryIs>${ring(r)}</innerBoundaryIs>`).join('')}</Polygon>`;
+      case 'MultiPoint': return `<MultiGeometry>${g.coordinates.map(c=>geom({type:'Point',coordinates:c})).join('')}</MultiGeometry>`;
+      case 'MultiLineString': return `<MultiGeometry>${g.coordinates.map(c=>geom({type:'LineString',coordinates:c})).join('')}</MultiGeometry>`;
+      case 'MultiPolygon': return `<MultiGeometry>${g.coordinates.map(c=>geom({type:'Polygon',coordinates:c})).join('')}</MultiGeometry>`;
+    }
+    return '';
+  };
+  const style = {point:'#pt', line:'#ln', poly:'#pg'};
+  let s = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>${xmlEsc(title)}</name>\n`
+    + `<Style id="pt"><IconStyle><color>ff156ded</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon></IconStyle></Style>\n`
+    + `<Style id="ln"><LineStyle><color>ff156ded</color><width>2.5</width></LineStyle></Style>\n`
+    + `<Style id="pg"><LineStyle><color>ff156ded</color><width>2</width></LineStyle><PolyStyle><color>55875414</color></PolyStyle></Style>\n`;
+  features.forEach((f,i)=>{
+    const nm = nameField ? f.p[nameField] : '';
+    s += `<Placemark><name>${xmlEsc(nm===undefined||nm===null||nm===''?String(i+1):nm)}</name><styleUrl>${style[CLASS[f.g.type]]}</styleUrl>`;
+    if(fields.length) s += `<ExtendedData>${fields.map(k=>`<Data name="${xmlEsc(k)}"><value>${xmlEsc(f.p[k]??'')}</value></Data>`).join('')}</ExtendedData>`;
+    s += geom(f.g)+`</Placemark>\n`;
+  });
+  return s + `</Document>\n</kml>\n`;
+}
+function writeGpx(features, nameField, descField){
+  const nm = (f,i) => { const v = nameField?f.p[nameField]:''; return v===undefined||v===null||v===''?String(i+1):v; };
+  let s = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Geospatial Engineering Tools - Conversor de Formatos Vectoriales" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+  const pt = (tag,c) => `<${tag} lat="${c[1]}" lon="${c[0]}">${c.length>2?`<ele>${c[2]}</ele>`:''}`;
+  const wpts=[], trks=[];
+  features.forEach((f,i)=>{
+    const g=f.g, d = descField && f.p[descField] ? `<desc>${xmlEsc(f.p[descField])}</desc>` : '';
+    if(g.type==='Point') wpts.push(`${pt('wpt',g.coordinates)}<name>${xmlEsc(nm(f,i))}</name>${d}</wpt>`);
+    else if(g.type==='MultiPoint') g.coordinates.forEach((c,k)=>wpts.push(`${pt('wpt',c)}<name>${xmlEsc(nm(f,i))}-${k+1}</name>${d}</wpt>`));
+    else {
+      const segs = g.type==='LineString'?[g.coordinates]:g.type==='MultiLineString'?g.coordinates:g.type==='Polygon'?[g.coordinates[0]]:g.coordinates.map(p=>p[0]);
+      trks.push(`<trk><name>${xmlEsc(nm(f,i))}</name>${d}${segs.map(sg=>`<trkseg>${sg.map(c=>pt('trkpt',c)+'</trkpt>').join('')}</trkseg>`).join('')}</trk>`);
+    }
+  });
+  return s + wpts.join('\n') + (wpts.length?'\n':'') + trks.join('\n') + `\n</gpx>\n`;
+}
+function writeGeoJSON(features, fields, epsg, isGeo){
+  const fc = {type:'FeatureCollection'};
+  if(!(isGeo && [4326,4170,4189].includes(epsg))) fc.crs = {type:'name', properties:{name:`urn:ogc:def:crs:EPSG::${epsg||'0'}`}};
+  fc.features = features.map(f=>{ const p={}; fields.forEach(k=>p[k]=f.p[k]??null); return {type:'Feature', properties:p, geometry:f.g}; });
+  return JSON.stringify(fc);
+}
+function csvCell(v, d){ const s = v===null||v===undefined ? '' : String(v); return /["\r\n]/.test(s) || s.includes(d) ? `"${s.replace(/"/g,'""')}"` : s; }
+function wktOfGeom(g){
+  const cc = c => c.join(' '), z = (()=>{ let h=false; eachCoord(g,c=>{ if(c.length>2) h=true; }); return h; })();
+  const fix = c => z && c.length<3 ? [...c,0] : c;
+  const l = a => '('+a.map(c=>cc(fix(c))).join(', ')+')', pl = p => '('+p.map(l).join(', ')+')';
+  const t = {Point:'POINT',LineString:'LINESTRING',Polygon:'POLYGON',MultiPoint:'MULTIPOINT',MultiLineString:'MULTILINESTRING',MultiPolygon:'MULTIPOLYGON'}[g.type] + (z?' Z':'');
+  switch(g.type){
+    case 'Point': return `${t} (${cc(fix(g.coordinates))})`;
+    case 'MultiPoint': return `${t} (${g.coordinates.map(c=>'('+cc(fix(c))+')').join(', ')})`;
+    case 'LineString': return t+' '+l(g.coordinates);
+    case 'Polygon': case 'MultiLineString': return t+' '+pl(g.coordinates);
+    case 'MultiPolygon': return `${t} (${g.coordinates.map(pl).join(', ')})`;
+  }
+}
+function writeCsv(features, fields, dst, d){
+  const allPts = features.every(f=>f.g.type==='Point');
+  const [cx, cy] = dst.type==='geo' ? ['lon','lat'] : ['este','norte'];
+  const hasZ = allPts && features.some(f=>f.g.coordinates.length>2);
+  const head = allPts ? [cx, cy, ...(hasZ?['z']:[]), ...fields] : ['wkt', ...fields];
+  const lines = [head.map(h=>csvCell(h,d)).join(d)];
+  for(const f of features){
+    const geo = allPts ? [f.g.coordinates[0], f.g.coordinates[1], ...(hasZ?[f.g.coordinates[2]??'']:[])] : [wktOfGeom(f.g)];
+    lines.push([...geo, ...fields.map(k=>f.p[k])].map(v=>csvCell(v,d)).join(d));
+  }
+  return '﻿' + lines.join('\r\n') + '\r\n';
+}
+function dxfLayerName(s){ s = String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9_\-$]/g,'_').slice(0,31); return s || '0'; }
+function writeDxf(features, layerField, labelField, isGeo){
+  const out = [];
+  const P = (c,v) => out.push(String(c), String(v));
+  const layerOf = f => layerField ? dxfLayerName(f.p[layerField]) : ({point:'PUNTOS', line:'LINEAS', poly:'POLIGONOS'})[CLASS[f.g.type]];
+  let ext=[Infinity,Infinity,-Infinity,-Infinity];
+  for(const f of features) eachCoord(f.g, c=>{ ext[0]=Math.min(ext[0],c[0]); ext[1]=Math.min(ext[1],c[1]); ext[2]=Math.max(ext[2],c[0]); ext[3]=Math.max(ext[3],c[1]); });
+  const span = Math.max(ext[2]-ext[0], ext[3]-ext[1]) || (isGeo?0.01:100);
+  const th = span/250;
+  const layers = [...new Set(features.map(layerOf))];
+  const colors = [1,2,3,4,5,6,30,140,200,40];
+  P(0,'SECTION'); P(2,'HEADER'); P(9,'$ACADVER'); P(1,'AC1009'); P(9,'$DWGCODEPAGE'); P(3,'ANSI_1252');
+  P(9,'$EXTMIN'); P(10,ext[0]); P(20,ext[1]); P(30,0); P(9,'$EXTMAX'); P(10,ext[2]); P(20,ext[3]); P(30,0); P(0,'ENDSEC');
+  P(0,'SECTION'); P(2,'TABLES');
+  P(0,'TABLE'); P(2,'LTYPE'); P(70,1); P(0,'LTYPE'); P(2,'CONTINUOUS'); P(70,0); P(3,'Solid line'); P(72,65); P(73,0); P(40,0.0); P(0,'ENDTAB');
+  P(0,'TABLE'); P(2,'LAYER'); P(70,layers.length);
+  layers.forEach((l,i)=>{ P(0,'LAYER'); P(2,l); P(70,0); P(62,colors[i%colors.length]); P(6,'CONTINUOUS'); });
+  P(0,'ENDTAB'); P(0,'ENDSEC');
+  P(0,'SECTION'); P(2,'ENTITIES');
+  const poly = (cs, layer, closed) => {
+    const z3 = cs.some(c=>c.length>2);
+    P(0,'POLYLINE'); P(8,layer); P(66,1); P(10,0); P(20,0); P(30,0); P(70,(closed?1:0)|(z3?8:0));
+    const pts = closed && cs.length>1 && cs[0][0]===cs[cs.length-1][0] && cs[0][1]===cs[cs.length-1][1] ? cs.slice(0,-1) : cs;
+    for(const c of pts){ P(0,'VERTEX'); P(8,layer); P(10,c[0]); P(20,c[1]); P(30,c[2]??0); P(70,z3?32:0); }
+    P(0,'SEQEND'); P(8,layer);
+  };
+  for(const f of features){
+    const g=f.g, layer=layerOf(f);
+    const pts = g.type==='Point'?[g.coordinates]:g.type==='MultiPoint'?g.coordinates:null;
+    if(pts) pts.forEach(c=>{ P(0,'POINT'); P(8,layer); P(10,c[0]); P(20,c[1]); P(30,c[2]??0); });
+    else if(g.type==='LineString') poly(g.coordinates, layer, false);
+    else if(g.type==='MultiLineString') g.coordinates.forEach(l=>poly(l,layer,false));
+    else if(g.type==='Polygon') g.coordinates.forEach(r=>poly(r,layer,true));
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>poly(r,layer,true)));
+    if(labelField && f.p[labelField]!==undefined && f.p[labelField]!==null && f.p[labelField]!==''){
+      let a = pts ? pts[0] : null;
+      if(!a){ let first=null; eachCoord(g,c=>{ if(!first) first=c; }); a=first; }
+      P(0,'TEXT'); P(8,layer); P(10,a[0]+th*0.6); P(20,a[1]+th*0.6); P(30,a[2]??0); P(40,th); P(1,String(f.p[labelField]).replace(/[\r\n]+/g,' '));
+    }
+  }
+  P(0,'ENDSEC'); P(0,'EOF');
+  const txt = out.join('\r\n')+'\r\n';
+  const u8 = new Uint8Array(txt.length); let lossy = 0;
+  for(let i=0;i<txt.length;i++){ const c=txt.charCodeAt(i); if(c<256) u8[i]=c; else { u8[i]=63; lossy++; } }
+  return {u8, layers, lossy};
+}
+
+/* =====================================================================
+   INTERFAZ
+   ===================================================================== */
+function clearMsgs(id){ $(id).innerHTML=''; }
+function addMsg(id, lvl, txt){ const d=document.createElement('div'); d.className='msg'; d.dataset.l=lvl; d.textContent=txt; $(id).appendChild(d); }
+
+function setData(d){
+  S.data = d;
+  const det = detectCRS(d);
+  S.det = det;
+  buildOptions($('selSrc'), false); buildOptions($('selDst'), true);
+  $('selSrc').disabled = false; $('selDst').disabled = false;
+  $('selSrc').value = det.id || 'WGS84:geo';
+  const src = crsParse($('selSrc').value);
+  S.srcId = $('selSrc').value;
+  // destino por defecto: UTM automático en el datum oficial del país
+  computePivot();
+  const P = S.piv;
+  const ec = inBox(BOX.EC,P.cLat,P.cLon) || inBox(BOX.GAL,P.cLat,P.cLon), ve = inBox(BOX.VE,P.cLat,P.cLon);
+  let dst = src.type==='geo' ? (ec?'SIRGAS:auto':ve?'REGVEN:auto':'WGS84:auto') : (src.datum==='CANOA'?'REGVEN:auto':src.datum==='PSADEC'?'SIRGAS:auto':src.datum+':geo');
+  S.dstId = dst; $('selDst').value = dst;
+  // resumen
+  const cnt = {point:0,line:0,poly:0}; d.features.forEach(f=>cnt[CLASS[f.g.type]]++);
+  const chips = [`<span class="chip">Formato <b>${esc(d.fmtName)}</b></span>`, `<span class="chip"><b>${d.features.length}</b> elementos</span>`];
+  for(const k of ['point','line','poly']) if(cnt[k]) chips.push(`<span class="chip"><b>${cnt[k]}</b> ${CLASS_NAME[k]}</span>`);
+  chips.push(`<span class="chip"><b>${countVerts(d.features)}</b> vértices</span>`, `<span class="chip"><b>${d.fields.length}</b> campos</span>`);
+  $('summary').innerHTML = chips.join('');
+  (d.notes||[]).forEach(n=>addMsg('loadMsgs','info',n));
+  // campos para nombre/capa
+  const guess = d.fields.find(f=>/^(nombre|name|nom|id|codigo|cod|punto|pto|label|etiqueta|texto)$/i.test(f)) || d.fields[0] || '';
+  const opts = ['<option value="">— ninguno —</option>', ...d.fields.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`)].join('');
+  $('selName').innerHTML = opts; $('selName').value = guess;
+  $('selLayer').innerHTML = opts; $('selLayer').value = d.fields.includes('capa') ? 'capa' : '';
+  $('secPreview').hidden = false;
+  drawTable();
+  refresh();
+}
+function drawTable(){
+  const d = S.data, cols = d.fields.slice(0,14), rows = d.features.slice(0,200);
+  $('tblSum').textContent = `Tabla de atributos (${d.features.length>200?'primeros 200 de '+d.features.length:d.features.length} registros${d.fields.length>14?', primeros 14 campos':''})`;
+  $('tbl').innerHTML = `<thead><tr><th>#</th><th>Tipo</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`
+    + rows.map((f,i)=>`<tr><td class="mono">${i+1}</td><td>${f.g.type}</td>${cols.map(c=>`<td title="${esc(f.p[c])}">${esc(f.p[c])}</td>`).join('')}</tr>`).join('') + '</tbody>';
+}
+function ensureMap(){
+  if(S.map || typeof L==='undefined') return;
+  S.map = L.map('map', {preferCanvas:true, attributionControl:true});
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap contributors'});
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri World Imagery'});
+  osm.addTo(S.map); L.control.layers({'OpenStreetMap':osm, 'Satélite (Esri)':sat}, {}, {position:'topright'}).addTo(S.map);
+}
+function drawMap(){
+  if(typeof L==='undefined'){ $('map').innerHTML='<p class="note" style="padding:12px">No se pudo cargar el mapa (sin conexión con la librería Leaflet). La conversión funciona igual.</p>'; return; }
+  ensureMap();
+  if(S.layer) S.map.removeLayer(S.layer);
+  const fc = {type:'FeatureCollection', features:S.piv.features.map(f=>({type:'Feature', geometry:f.g, properties:f.p}))};
+  S.layer = L.geoJSON(fc, {
+    style:{color:'#ED6D15', weight:2, fillColor:'#145487', fillOpacity:.25},
+    pointToLayer:(f,ll)=>L.circleMarker(ll,{radius:5, color:'#FFFFFF', weight:1.5, fillColor:'#ED6D15', fillOpacity:1}),
+    onEachFeature:(f,l)=>{ const k=Object.keys(f.properties).slice(0,12); if(k.length) l.bindPopup(k.map(x=>`<b>${esc(x)}</b>: ${esc(f.properties[x])}`).join('<br>')); }
+  }).addTo(S.map);
+  const b = S.layer.getBounds();
+  if(b.isValid()) S.map.fitBounds(b.pad(0.15), {maxZoom:17});
+  setTimeout(()=>S.map.invalidateSize(), 50);
+}
+function refresh(){
+  if(!S.data) return;
+  clearMsgs('crsMsgs'); clearMsgs('fmtMsgs'); clearMsgs('outMsgs');
+  const det = S.det, src = crsParse(S.srcId);
+  $('srcBadge').innerHTML = S.srcId===det.id ? (det.sure?'<span class="badge ok">detectado</span>':'<span class="badge warn">estimado</span>') : '<span class="badge ok">elegido</span>';
+  $('srcNote').textContent = S.srcId===det.id ? det.note : 'Sistema de origen elegido manualmente.';
+  const forced = ['kml','kmz','gpx'].includes(S.fmt);
+  $('selDst').disabled = forced;
+  if(forced) $('selDst').value = 'WGS84:geo'; else $('selDst').value = S.dstId;
+  $('dstNote').textContent = forced ? `${S.fmt.toUpperCase()} solo admite WGS 84 geográficas.` : (crsParse(S.dstId).type==='auto' ? 'La zona se elige por la longitud media de los datos y el hemisferio por su latitud media.' : '');
+  if(det.sure===false && S.srcId===det.id) addMsg('crsMsgs','warn','Confirme el sistema de origen: si los elementos no caen donde corresponde en el mapa, la zona o el datum elegidos son incorrectos.');
+  computePivot(); drawMap();
+  const plan = makePlan(); S.plan = plan;
+  // Operación
+  const op = plan.op;
+  $('op').hidden = false;
+  $('op').innerHTML = `<div><span class="lbl">Operación</span></div><b>${esc(op.title)}</b>${op.lines.map(l=>`<span>${esc(l)}</span>`).join('')}${(op.params||[]).map(p=>`<span class="mono">${esc(p)}</span>`).join('')}`
+    + `<span class="mono">${esc(crsFull(plan.src))} → ${esc(crsFull(plan.dst))}${plan.autoInfo?' · zona automática':''}</span>`;
+  plan.msgs.forEach(([l,t])=>addMsg('crsMsgs', l, t));
+  // Muestra de control
+  if(!plan.blocked){
+    const T = makeTransformer(plan); let first=null; for(const f of S.data.features){ eachCoord(f.g,c=>{ if(!first) first=c; }); if(first) break; }
+    const o = T(first), fmtC = (c,geo) => geo ? `lon ${c[0].toFixed(9)}  lat ${c[1].toFixed(9)}` : `E ${c[0].toFixed(3)}  N ${c[1].toFixed(3)}`;
+    $('sample').textContent = `Origen  ${fmtC(first, plan.src.type==='geo')}\nDestino ${fmtC(o, plan.dst.type==='geo')}`;
+    $('sampleBox').hidden = false;
+  } else $('sampleBox').hidden = true;
+  // Opciones y avisos de formato
+  const f = S.fmt, d = S.data;
+  $('optName').hidden = !['kml','kmz','gpx','dxf'].includes(f);
+  $('optLayer').hidden = f!=='dxf';
+  $('optLabels').hidden = f!=='dxf';
+  $('optDelim').hidden = f!=='csv';
+  $('optName').querySelector('label').textContent = f==='dxf' ? 'Campo para los rótulos' : 'Campo para el nombre';
+  const cnt = {point:0,line:0,poly:0}; d.features.forEach(x=>cnt[CLASS[x.g.type]]++);
+  const kinds = Object.values(cnt).filter(Boolean).length;
+  const longNames = d.fields.filter(x=>x.length>10 || /[^A-Za-z0-9_]/.test(x));
+  if(f==='shp'){
+    if(kinds>1) addMsg('fmtMsgs','info',`Un Shapefile admite un solo tipo de geometría: se generarán ${kinds} capas (${['point','line','poly'].filter(k=>cnt[k]).map(k=>CLASS_NAME[k]).join(', ')}) en un .zip.`);
+    if(longNames.length) addMsg('fmtMsgs','warn',`Nombres de campo que se ajustarán a 10 caracteres sin acentos ni espacios: ${longNames.slice(0,8).join(', ')}${longNames.length>8?'…':''}. El informe lista la equivalencia.`);
+    addMsg('fmtMsgs','info','Se incluyen .shp, .shx, .dbf (UTF-8), .cpg y .prj.');
+  }
+  if(f==='kml'||f==='kmz') addMsg('fmtMsgs','info','Se conservan todos los atributos como datos extendidos (ExtendedData). Coordenadas en WGS 84 geográficas, como exige el formato.');
+  if(f==='geojson' && !(plan.dst.type==='geo' && ['WGS84','SIRGAS','REGVEN'].includes(plan.dst.datum))) addMsg('fmtMsgs','warn','El estándar GeoJSON (RFC 7946) exige WGS 84 geográficas. Se agregará el miembro "crs" (heredado), que QGIS y GDAL leen, pero otros programas pueden ignorarlo.');
+  if(f==='dxf'){ addMsg('fmtMsgs','warn','El DXF no guarda la tabla de atributos ni el sistema de coordenadas: solo la geometría, la capa y, si lo activa, un rótulo por elemento.');
+    if(plan.dst.type==='geo') addMsg('fmtMsgs','warn','Un DXF en coordenadas geográficas (grados) es poco práctico en CAD; se recomienda un destino UTM.'); }
+  if(f==='gpx'){ addMsg('fmtMsgs','warn','GPX solo guarda nombre, descripción y elevación: el resto de los atributos se pierde.');
+    if(cnt.poly) addMsg('fmtMsgs','warn',`${cnt.poly} polígono(s) se exportarán como tracks con su contorno exterior; los huecos se pierden.`); }
+  if(f==='csv' && (cnt.line||cnt.poly)) addMsg('fmtMsgs','info','Hay líneas o polígonos: la geometría se escribe en una columna WKT.');
+  $('btnGo').disabled = plan.blocked; $('btnRep').disabled = plan.blocked;
+}
+
+async function convert(){
+  const plan = S.plan, d = S.data; if(!plan || plan.blocked) return;
+  clearMsgs('outMsgs');
+  const T = makeTransformer(plan);
+  const feats = d.features.map(f=>({g:mapGeom(f.g, T), p:f.p}));
+  const fields = d.fields, dst = plan.dst, fmt = S.fmt;
+  const tag = dst.type==='geo' ? `${SHORT[dst.datum].replace(/\s+/g,'')}_geo` : `${SHORT[dst.datum].replace(/\s+/g,'')}_UTM${dst.zs}`;
+  const base = `${d.name}_${tag}`.replace(/[^\w.-]+/g,'_');
+  const report = {files:[], notes:[]};
+  let blob, fname;
+  try{
+    if(fmt==='shp'){
+      if(typeof JSZip==='undefined') throw new Error('No se pudo cargar JSZip (revise la conexión) y el Shapefile requiere empaquetarse en .zip.');
+      const z = new JSZip();
+      for(const cls of ['point','line','poly']){
+        const fs = feats.filter(f=>CLASS[f.g.type]===cls); if(!fs.length) continue;
+        const nm = feats.some(f=>CLASS[f.g.type]!==cls) ? `${base}_${CLASS_NAME[cls].normalize('NFD').replace(/[̀-ͯ]/g,'')}` : base;
+        const L = writeShpLayer(fs, cls), D = writeDbf(fs, fields);
+        z.file(nm+'.shp', L.shp); z.file(nm+'.shx', L.shx); z.file(nm+'.dbf', D.buf); z.file(nm+'.cpg', 'UTF-8'); z.file(nm+'.prj', wktOf(dst));
+        report.files.push(`${nm}.shp (${CLASS_NAME[cls]}: ${fs.length}${L.hasZ?', con Z':''})`);
+        if(D.renamed.length && !report.notes.some(n=>n.startsWith('Campos renombrados'))) report.notes.push('Campos renombrados para el .dbf: '+D.renamed.join('; '));
+        D.warns.forEach(w=>{ if(!report.notes.includes(w)) report.notes.push(w); });
+      }
+      blob = await z.generateAsync({type:'blob', compression:'DEFLATE'}); fname = base+'_shp.zip';
+    }
+    else if(fmt==='kml'||fmt==='kmz'){
+      const k = writeKml(feats, fields, $('selName').value, d.name);
+      if(fmt==='kml'){ blob = new Blob([k], {type:'application/vnd.google-earth.kml+xml'}); fname = base+'.kml'; }
+      else { if(typeof JSZip==='undefined') throw new Error('No se pudo cargar JSZip para crear el KMZ.'); const z=new JSZip(); z.file('doc.kml', k); blob = await z.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/vnd.google-earth.kmz'}); fname = base+'.kmz'; }
+    }
+    else if(fmt==='geojson'){ blob = new Blob([writeGeoJSON(feats, fields, epsgOf(dst.datum,dst.type,dst.zs), dst.type==='geo')], {type:'application/geo+json'}); fname = base+'.geojson'; }
+    else if(fmt==='gpx'){ const dsc = fields.find(f=>/^(descripcion|description|desc)$/i.test(f)) || ''; blob = new Blob([writeGpx(feats, $('selName').value, dsc)], {type:'application/gpx+xml'}); fname = base+'.gpx'; }
+    else if(fmt==='csv'){ const dl = $('selDelim').value==='\\t' ? '\t' : $('selDelim').value; blob = new Blob([writeCsv(feats, fields, dst, dl)], {type:'text/csv'}); fname = base+'.csv'; }
+    else if(fmt==='dxf'){ const r = writeDxf(feats, $('selLayer').value, $('chkLabels').checked ? $('selName').value : '', dst.type==='geo');
+      blob = new Blob([r.u8], {type:'application/dxf'}); fname = base+'.dxf';
+      report.notes.push(`Capas DXF: ${r.layers.slice(0,20).join(', ')}${r.layers.length>20?'…':''}`);
+      if(r.lossy) report.notes.push(`${r.lossy} carácter(es) fuera de Windows-1252 se reemplazaron por «?».`); }
+    if(!report.files.length) report.files.push(fname);
+    download(blob, fname);
+    S.lastReport = {fname, ...report, when:new Date()};
+    addMsg('outMsgs','ok',`Descargado: ${fname} · ${feats.length} elementos · ${crsFull(dst)}.`);
+    report.notes.forEach(n=>addMsg('outMsgs','info',n));
+  }catch(err){ addMsg('outMsgs','err', err.message||String(err)); }
+}
+function download(blob, name){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function reportText(){
+  const p = S.plan, d = S.data, r = S.lastReport, L = [];
+  const cnt = {point:0,line:0,poly:0}; d.features.forEach(f=>cnt[CLASS[f.g.type]]++);
+  L.push('INFORME DE CONVERSIÓN · Conversor de Formatos Vectoriales', 'Geospatial Engineering Tools · Elaborado por Ing. Geodesta Mario Forgione L. · https://www.linkedin.com/in/mario-forgione/', '');
+  L.push(`Fecha: ${new Date().toLocaleString('es')}`, '');
+  L.push('ENTRADA', `  Archivo: ${d.name} (${d.fmtName})`, `  Elementos: ${d.features.length} (puntos ${cnt.point}, líneas ${cnt.line}, polígonos ${cnt.poly}) · vértices ${countVerts(d.features)}`, `  Campos: ${d.fields.join(', ')||'—'}`);
+  L.push(`  Sistema de origen: ${crsFull(p.src)} [${S.srcId===S.det.id?(S.det.sure?'detectado':'estimado'):'elegido manualmente'}]`, '');
+  L.push('OPERACIÓN', `  ${p.op.title}`, ...p.op.lines.map(l=>'  '+l), ...(p.op.params||[]).map(l=>'  '+l));
+  L.push(`  Sistema de destino: ${crsFull(p.dst)}${p.autoInfo?' (zona elegida automáticamente por longitud y hemisferio)':''}`, '  Solo se transforma la parte horizontal; la coordenada Z se conserva.', '');
+  if(p.msgs.length){ L.push('ADVERTENCIAS'); p.msgs.forEach(([l,t])=>L.push(`  [${l==='err'?'ERROR':l==='warn'?'AVISO':'NOTA'}] ${t}`)); L.push(''); }
+  L.push('SALIDA', `  Formato: ${S.fmt.toUpperCase()}`);
+  if(r){ L.push(`  Archivo descargado: ${r.fname}`); r.files.forEach(f=>L.push('    · '+f)); r.notes.forEach(n=>L.push('  '+n)); }
+  else L.push('  (aún no se ha descargado la conversión)');
+  if((d.notes||[]).length){ L.push('', 'NOTAS DE LECTURA'); d.notes.forEach(n=>L.push('  '+n)); }
+  L.push('', 'DESCARGO: Herramienta de apoyo técnico; no es un producto certificado. Verifique el resultado en su SIG o CAD y contra vértices de control oficiales en trabajos formales.');
+  return L.join('\r\n');
+}
+
+/* ---------- Ejemplos ---------- */
+function example(which){
+  let d;
+  if(which==='EC'){ // Quito, SIRGAS-ECU UTM 17S (coordenadas de demostración)
+    const pts = [[-78.5125,-0.2201,'Punto 1'],[-78.4955,-0.1807,'Punto 2'],[-78.4880,-0.1260,'Punto 3']];
+    const T = c=>utmFwd(c[1],c[0],17,true,ELL.GRS80).map(r4);
+    const feats = pts.map(p=>({g:{type:'Point',coordinates:T(p)}, p:{nombre:p[2], tipo:'referencia'}}));
+    feats.push({g:{type:'LineString',coordinates:[[-78.5125,-0.2201],[-78.5040,-0.2010],[-78.4955,-0.1807],[-78.4880,-0.1260]].map(T)}, p:{nombre:'Recorrido de ejemplo', tipo:'ruta'}});
+    feats.push({g:{type:'Polygon',coordinates:[[[-78.4990,-0.1860],[-78.4895,-0.1840],[-78.4880,-0.1770],[-78.4975,-0.1765],[-78.4990,-0.1860]].map(T)]}, p:{nombre:'Polígono de ejemplo', tipo:'área'}});
+    d = {kind:'csv', fmtName:'Ejemplo', name:'ejemplo_quito', features:feats, order:['nombre','tipo'], notes:['Datos de demostración en SIRGAS-ECU / UTM 17S, sin .prj, para probar la detección y la conversión.'],
+      prj: wktOf(crsParse('SIRGAS:17S'))};
+  } else { // Maracaibo, La Canoa UTM 19N
+    const T = c=>{ const [la,lo]=fromPivot('CANOA',c[1],c[0]); return utmFwd(la,lo,19,false,ELL.INTL).map(r4); };
+    const feats = [[-71.6125,10.6427,'Punto 1'],[-71.6440,10.6680,'Punto 2'],[-71.6000,10.6000,'Punto 3']].map(p=>({g:{type:'Point',coordinates:T(p)}, p:{nombre:p[2], tipo:'referencia'}}));
+    feats.push({g:{type:'Polygon',coordinates:[[[-71.640,10.630],[-71.610,10.632],[-71.605,10.655],[-71.638,10.657],[-71.640,10.630]].map(T)]}, p:{nombre:'Lote de ejemplo', tipo:'área'}});
+    d = {kind:'csv', fmtName:'Ejemplo', name:'ejemplo_maracaibo', features:feats, order:['nombre','tipo'], notes:['Datos de demostración en La Canoa (PSAD56) / UTM 19N, para probar la transformación PATVEN-98.'],
+      prj: wktOf(crsParse('CANOA:19N'))};
+  }
+  clearMsgs('loadMsgs');
+  d.fields = fieldsOf(d.features, d.order);
+  setData(d);
+}
+
+/* ---------- Eventos ---------- */
+(function init(){
+  buildOptions($('selSrc'), false); buildOptions($('selDst'), true);
+  const drop = $('drop'), inp = $('file');
+  drop.addEventListener('click', ()=>inp.click());
+  drop.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); inp.click(); } });
+  inp.addEventListener('change', ()=>{ loadFiles(inp.files); inp.value=''; });
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e=>loadFiles(e.dataTransfer.files));
+  $('exEC').addEventListener('click', ()=>example('EC'));
+  $('exVE').addEventListener('click', ()=>example('VE'));
+  $('selSrc').addEventListener('change', e=>{ S.srcId = e.target.value; refresh(); });
+  $('selDst').addEventListener('change', e=>{ S.dstId = e.target.value; refresh(); });
+  $('segFmt').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return;
+    S.fmt = b.dataset.f; $('segFmt').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed', String(x===b))); refresh(); });
+  $('btnGo').addEventListener('click', convert);
+  $('btnRep').addEventListener('click', ()=>download(new Blob(['﻿'+reportText()],{type:'text/plain'}), `${S.data.name}_informe_conversion.txt`));
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

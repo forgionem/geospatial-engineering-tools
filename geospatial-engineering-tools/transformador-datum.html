@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformador de Datum · La Canoa ⇄ REGVEN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  /* Sistema visual del Planificador de Misiones UAV: claro por defecto, oscuro automático (o forzado con data-theme) */
+  :root{
+    --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+    --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF;
+    --ok:#2E7A4D; --warn:#B4600F; --bad:#B42318; --warnbg:#FDF1E7; --badbg:#FCEBE9;
+    --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+    --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+    --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+    --brand:#4F8FC7; --brand-ink:#08121C; --ok:#5DBB86; --warn:#F0A04B; --bad:#F2796B; --warnbg:#2A1E12; --badbg:#2D1816; color-scheme:dark}}
+  :root[data-theme="dark"]{
+    --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+    --brand:#4F8FC7; --brand-ink:#08121C; --ok:#5DBB86; --warn:#F0A04B; --bad:#F2796B; --warnbg:#2A1E12; --badbg:#2D1816; color-scheme:dark}
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--f-body); font-size:14px; line-height:1.45;
+    padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
+    padding-block:18px 28px;
+  }
+  .wrap{max-width:980px; margin:0 auto;}
+
+  header{border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:18px; text-align:center;}
+  h1{font-family:var(--f-disp); font-weight:800; font-size:26px; letter-spacing:.04em; color:var(--brand); margin:0 0 10px; line-height:1.1; text-transform:uppercase; text-wrap:balance;}
+  h1 .u{color:var(--accent);}
+  header p{color:var(--muted); font-size:13px; max-width:72ch; margin:0 auto;}
+  header p.author{margin:10px auto 0; font:500 12px var(--f-mono); color:var(--ink); letter-spacing:.02em; max-width:none;}
+  a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor;}
+  a.li:hover{color:var(--accent);}
+  header p.author a{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor;}
+  header p.author a:hover{color:var(--accent);}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px 18px; margin-bottom:16px;}
+  .card h2{
+    font-family:var(--f-disp); font-weight:700; font-size:13px; letter-spacing:.07em; text-transform:uppercase;
+    margin:0 0 14px; color:var(--brand); display:flex; align-items:center; gap:8px;
+  }
+  .card h2 .n{color:var(--accent);}
+
+  .row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+  .seg{display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--panel); flex-wrap:wrap;}
+  .seg button{background:transparent; border:0; color:var(--muted); padding:7px 12px; font:600 13px var(--f-body); cursor:pointer;}
+  .seg button.active{background:var(--brand); color:var(--brand-ink);}
+  .seg button:hover:not(.active){color:var(--ink); background:var(--field);}
+
+  /* Selector principal de módulos: igual a los botones de modo del Planificador UAV */
+  #segTool{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; border:0; background:transparent; overflow:visible; margin-bottom:16px !important;}
+  #segTool button{font:700 12px var(--f-disp); letter-spacing:.05em; text-transform:uppercase; padding:11px 8px; border-radius:6px; border:1px solid var(--line); background:var(--field); color:var(--muted); line-height:1.25;}
+  #segTool button.active{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
+  #segTool button:hover:not(.active){background:var(--field); color:var(--ink); border-color:var(--muted);}
+  @media (max-width:760px){ #segTool{grid-template-columns:repeat(2,minmax(0,1fr));} }
+
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px;}
+  input[type=text], input[type=number], select, textarea{
+    width:100%; background:var(--field); border:1px solid var(--line); color:var(--ink);
+    padding:7px 8px; border-radius:5px; font:500 14px var(--f-mono); min-width:0;
+  }
+  select{font-family:var(--f-body);}
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, summary:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+  .field{flex:1; min-width:140px;}
+  textarea{font-size:12.5px; min-height:130px; resize:vertical;}
+
+  .btn{
+    background:var(--brand); color:var(--brand-ink); border:1px solid var(--brand); padding:9px 18px;
+    font:600 13px var(--f-body); border-radius:5px; cursor:pointer;
+  }
+  .btn:hover{border-color:var(--muted);}
+  .btn.ghost{background:var(--field); border:1px solid var(--line); color:var(--ink);}
+  .btn.ghost:hover{border-color:var(--muted); color:var(--ink);}
+  .btn.small{padding:7px 11px; font-size:13px;}
+
+  .result{background:var(--field); border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:6px; padding:14px 16px; margin-top:16px; display:none;}
+  .result.show{display:block;}
+  .result .rlabel{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.08em; color:var(--brand); margin-bottom:10px;}
+  .coords{font-family:var(--f-mono); font-size:15px; display:grid; gap:6px;}
+  .coords .k{color:var(--muted);}
+  .coords .v{color:var(--ink); font-weight:600;}
+
+  table{width:100%; border-collapse:collapse; font-family:var(--f-mono); font-size:12.5px; margin-top:14px;}
+  th,td{padding:7px 9px; text-align:left; border-bottom:1px solid var(--line);}
+  th{color:var(--muted); font:600 11px var(--f-body); letter-spacing:.07em; text-transform:uppercase;}
+  tr:hover td{background:var(--field);}
+
+  .note{font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5;}
+  .note.warn{color:var(--warn);}
+  details{margin-top:6px;}
+  summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--brand); margin-bottom:8px; list-style:none;}
+  summary::-webkit-details-marker{display:none;}
+  summary::before{content:"+ "; font-family:var(--f-mono);}
+  details[open] > summary::before{content:"– ";}
+  summary:hover{color:var(--accent);}
+  .params{font-family:var(--f-mono); font-size:12px; color:var(--ink); display:grid; grid-template-columns:1fr 1fr; gap:5px 20px; padding:12px 0 4px;}
+  .params div span{color:var(--muted);}
+
+  footer{margin-top:22px; padding-top:12px; border-top:1px solid var(--line); font-size:12px; color:var(--muted);}
+  .hide{display:none !important;}
+
+  .dropzone{display:block; border:1px dashed var(--line); border-radius:6px; padding:26px 18px; text-align:center; color:var(--muted); background:var(--field); cursor:pointer; font-size:14px; line-height:1.6;}
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent); color:var(--ink);}
+  .filelist{margin-top:12px; font-family:var(--f-mono); font-size:12px; color:var(--ink); line-height:1.7;}
+  .filelist .sz{color:var(--muted);}
+  #vReport h3{font:700 12px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; margin:22px 0 8px; color:var(--brand);}
+  #vReport h3:first-child{margin-top:0;}
+  .warnlist{margin:12px 0 0; padding-left:18px; color:var(--warn); font-size:12.5px; line-height:1.6;}
+  .notelist{margin:10px 0 0; padding-left:18px; color:var(--muted); font-size:12.5px; line-height:1.6;}
+  #vDownloads{display:flex; gap:10px; flex-wrap:wrap; margin-top:18px;}
+  .sources-note{margin-top:16px; font-size:12px; color:var(--muted);}
+  .sources-note summary{cursor:pointer;}
+  .sources-note ul{margin:10px 0 0; padding-left:18px; line-height:1.65; color:var(--muted);}
+  .sources-note li{margin-bottom:5px;}
+
+  #map, #uMap, #vMap{width:100%; height:420px; border:1px solid var(--line); border-radius:6px; background:var(--field); z-index:0;}
+  #mapPlaceholder, #uMapPlaceholder, #vMapPlaceholder{
+    height:420px; border:1px dashed var(--line); border-radius:6px; background:var(--field); display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:13px; text-align:center; padding:20px;
+  }
+  @media (max-width:640px){ #map, #uMap, #vMap, #mapPlaceholder, #uMapPlaceholder, #vMapPlaceholder{height:340px;} }
+  .legend{display:flex; gap:14px; margin-top:12px; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);}
+  .legend .dot{width:11px; height:11px; border-radius:50%; display:inline-block; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--line);}
+  .dot.src{background:var(--muted);}
+  .dot.dst{background:var(--accent);}
+  .leaflet-container{font-family:var(--f-body);}
+  .leaflet-popup-content-wrapper{background:var(--panel); color:var(--ink); border-radius:6px;}
+  .leaflet-popup-content{font-family:var(--f-mono); font-size:12px;}
+  .leaflet-popup-tip{background:var(--panel);}
+  @media (max-width:640px){ .params{grid-template-columns:1fr;} h1{font-size:21px;} }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important;}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Transformador de <span class="u">Datum</span> · La Canoa ⇄ REGVEN</h1>
+    <p>Transformación oficial PATVEN_98 mediante los modelos Molodensky-Badekas, Molodensky y Bursa-Wolf, más un módulo de conversión entre coordenadas UTM y Geográficas dentro de un mismo datum, otro para transformar archivos vectoriales (Shapefile y DXF) y un conversor de coordenadas geográficas entre grados, minutos y segundos (GMS) y grados decimales. Conforme a los parámetros publicados por el IGVSB / LGFS (SIRGAS-REGVEN, vigente desde 1999).</p>
+    <p class="author">Elaborado por Ing. Geodesta <strong>Mario Forgione L.</strong> · <a href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a></p>
+  </header>
+
+  <div class="seg" id="segTool" style="margin-bottom:22px;">
+    <button data-v="datum" class="active">Transformación de Datum (Canoa ⇄ REGVEN)</button>
+    <button data-v="utm">Conversión UTM ⇄ Geográficas</button>
+    <button data-v="files">Archivos vectoriales (Shapefile / DXF)</button>
+    <button data-v="dms">Conversor GMS ⇄ Decimales</button>
+  </div>
+
+  <div id="toolDatum">
+
+  <div class="card">
+    <h2><span class="n">01</span> Modelo de transformación</h2>
+    <div class="seg" id="segModel">
+      <button data-v="mb" class="active">Molodensky-Badekas (10 parámetros + PF)</button>
+      <button data-v="molodensky">Molodensky (3 parámetros)</button>
+      <button data-v="bursa">Bursa-Wolf (7 parámetros)</button>
+    </div>
+    <p class="note" id="modelNote"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">02</span> Dirección de la transformación</h2>
+    <div class="seg" id="segDir">
+      <button data-v="toRegven" class="active">La Canoa (PSAD56) → REGVEN (SIRGAS)</button>
+      <button data-v="toCanoa">REGVEN (SIRGAS) → La Canoa (PSAD56)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">03</span> Modo de entrada</h2>
+    <div class="row">
+      <div class="seg" id="segMode">
+        <button data-v="single" class="active">Punto único</button>
+        <button data-v="batch">Lote (varios puntos)</button>
+      </div>
+      <div class="seg" id="segFmt">
+        <button data-v="utm" class="active">UTM</button>
+        <button data-v="geo">Geográficas</button>
+      </div>
+    </div>
+
+    <!-- SINGLE -->
+    <div id="panelSingle">
+      <div id="utmSingle">
+        <div class="row">
+          <div class="field" style="max-width:120px;">
+            <label>Huso</label>
+            <select id="s_zone"><option value="18">18 Norte</option><option value="19" selected>19 Norte</option><option value="20">20 Norte</option></select>
+          </div>
+          <div class="field"><label>Este (X, m)</label><input type="text" id="s_e" placeholder="ej. 354996.000"></div>
+          <div class="field"><label>Norte (Y, m)</label><input type="text" id="s_n" placeholder="ej. 1058467.000"></div>
+          <div class="field" style="max-width:160px;"><label>Altura elipsoidal (m)</label><input type="text" id="s_h_utm" placeholder="0.000"></div>
+        </div>
+      </div>
+      <div id="geoSingle" class="hide">
+        <div class="row">
+          <div class="field"><label>Latitud (grados decimales, N+ / S-)</label><input type="text" id="s_lat" placeholder="ej. 9.583441"></div>
+          <div class="field"><label>Longitud (grados decimales, W-)</label><input type="text" id="s_lon" placeholder="ej. -66.080025"></div>
+          <div class="field" style="max-width:160px;"><label>Altura elipsoidal (m)</label><input type="text" id="s_h_geo" placeholder="0.000"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <button class="btn" id="btnCalc">Transformar</button>
+        <button class="btn ghost small" id="btnDemo">Cargar ejemplo de validación (EPSG)</button>
+      </div>
+
+      <div class="result" id="result">
+        <div class="rlabel">RESULTADO</div>
+        <div class="coords" id="resultCoords"></div>
+        <div class="note" id="resultNote"></div>
+      </div>
+    </div>
+
+    <!-- BATCH -->
+    <div id="panelBatch" class="hide">
+      <label id="batchLabel">Pega las coordenadas — una por línea, separadas por coma:<br>id,huso,este,norte,altura(opcional)</label>
+      <textarea id="batchInput" placeholder="P1,19,354996.000,1058467.000,0
+P2,19,355210.500,1058390.200,0"></textarea>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" id="btnCalcBatch">Transformar lote</button>
+        <button class="btn ghost small" id="btnDownload" style="display:none;">Descargar CSV</button>
+      </div>
+      <div id="batchOut"></div>
+    </div>
+
+    <p class="note warn" id="scaleNote"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">04</span> Mapa de puntos</h2>
+    <div id="mapPlaceholder">Transforma un punto o un lote para verlo aquí sobre el mapa.</div>
+    <div id="map" class="hide"></div>
+    <div class="legend" id="mapLegend" style="display:none;">
+      <span><i class="dot dst"></i> Destino</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">05</span> Parámetros aplicados</h2>
+    <details id="paramsDetails" open>
+      <summary id="paramsSummary">Ver parámetros oficiales PATVEN_98 aplicados por el modelo actual</summary>
+      <div class="params" id="paramsGrid"></div>
+      <p class="note" id="paramsFooterNote"></p>
+    </details>
+  </div>
+
+  </div><!-- /toolDatum -->
+
+  <div id="toolUTM" class="hide">
+
+  <div class="card">
+    <h2><span class="n">01</span> Elipsoide / Datum de trabajo</h2>
+    <div class="seg" id="segUDatum">
+      <button data-v="canoa" class="active">La Canoa (PSAD56 — Hayford 1924)</button>
+      <button data-v="regven">REGVEN (SIRGAS — GRS80)</button>
+    </div>
+    <p class="note">Esta conversión NO cambia de datum — solo pasa entre coordenadas UTM y Geográficas dentro del mismo sistema de referencia que elijas aquí. Si necesitas cambiar de La Canoa a REGVEN (o viceversa), usa la pestaña "Transformación de Datum".</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">02</span> Dirección</h2>
+    <div class="seg" id="segUDir">
+      <button data-v="toGeo" class="active">UTM → Geográficas</button>
+      <button data-v="toUTM">Geográficas → UTM</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">03</span> Modo de entrada</h2>
+    <div class="row">
+      <div class="seg" id="segUMode">
+        <button data-v="single" class="active">Punto único</button>
+        <button data-v="batch">Lote (varios puntos)</button>
+      </div>
+    </div>
+
+    <!-- SINGLE -->
+    <div id="uPanelSingle">
+      <div id="uUtmSingle">
+        <div class="row">
+          <div class="field" style="max-width:120px;">
+            <label>Huso</label>
+            <select id="u_s_zone"><option value="18">18 Norte</option><option value="19" selected>19 Norte</option><option value="20">20 Norte</option></select>
+          </div>
+          <div class="field"><label>Este (X, m)</label><input type="text" id="u_s_e" placeholder="ej. 354996.000"></div>
+          <div class="field"><label>Norte (Y, m)</label><input type="text" id="u_s_n" placeholder="ej. 1058467.000"></div>
+          <div class="field" style="max-width:160px;"><label>Altura (m)</label><input type="text" id="u_s_h" placeholder="0.000"></div>
+        </div>
+      </div>
+      <div id="uGeoSingle" class="hide">
+        <div class="row">
+          <div class="field"><label>Latitud (grados decimales, N+ / S-)</label><input type="text" id="u_s_lat" placeholder="ej. 9.583441"></div>
+          <div class="field"><label>Longitud (grados decimales, W-)</label><input type="text" id="u_s_lon" placeholder="ej. -66.080025"></div>
+          <div class="field" style="max-width:120px;"><label>Huso destino</label>
+            <select id="u_s_zoneOut"><option value="18">18 Norte</option><option value="19" selected>19 Norte</option><option value="20">20 Norte</option></select>
+          </div>
+          <div class="field" style="max-width:160px;"><label>Altura (m)</label><input type="text" id="u_s_h_geo" placeholder="0.000"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <button class="btn" id="uBtnCalc">Convertir</button>
+      </div>
+
+      <div class="result" id="uResult">
+        <div class="rlabel">RESULTADO</div>
+        <div class="coords" id="uResultCoords"></div>
+        <div class="note" id="uResultNote"></div>
+      </div>
+    </div>
+
+    <!-- BATCH -->
+    <div id="uPanelBatch" class="hide">
+      <label id="uBatchLabel">Pega las coordenadas — una por línea, separadas por coma:<br>id,huso,este,norte,altura(opcional)</label>
+      <textarea id="uBatchInput" placeholder="P1,19,354996.000,1058467.000,0
+P2,19,355210.500,1058390.200,0"></textarea>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" id="uBtnCalcBatch">Convertir lote</button>
+        <button class="btn ghost small" id="uBtnDownload" style="display:none;">Descargar CSV</button>
+      </div>
+      <div id="uBatchOut"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">04</span> Mapa de puntos</h2>
+    <div id="uMapPlaceholder">Convierte un punto o un lote para verlo aquí sobre el mapa.</div>
+    <div id="uMap" class="hide"></div>
+    <div class="legend" id="uMapLegend" style="display:none;">
+      <span><i class="dot dst"></i> Resultado</span>
+    </div>
+  </div>
+
+  </div><!-- /toolUTM -->
+
+  <div id="toolFiles" class="hide">
+
+  <div class="card">
+    <h2><span class="n">01</span> Modelo de transformación</h2>
+    <div class="seg" id="segVModel">
+      <button data-v="mb" class="active">Molodensky-Badekas (10 parámetros + PF)</button>
+      <button data-v="molodensky">Molodensky (3 parámetros)</button>
+      <button data-v="bursa">Bursa-Wolf (7 parámetros)</button>
+    </div>
+    <p class="note" id="vModelNote"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">02</span> Dirección de la transformación</h2>
+    <div class="seg" id="segVDir">
+      <button data-v="toRegven" class="active">La Canoa (PSAD56) → REGVEN (SIRGAS)</button>
+      <button data-v="toCanoa">REGVEN (SIRGAS) → La Canoa (PSAD56)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">03</span> Sistema de coordenadas del archivo de origen</h2>
+    <div class="row">
+      <div class="seg" id="segVFmt">
+        <button data-v="utm" class="active">UTM</button>
+        <button data-v="geo">Geográficas (grados)</button>
+      </div>
+      <div class="field" id="vZoneWrap" style="max-width:140px;">
+        <label>Huso</label>
+        <select id="v_zone"><option value="18">18 Norte</option><option value="19" selected>19 Norte</option><option value="20">20 Norte</option></select>
+      </div>
+    </div>
+    <p class="note">Declara siempre el sistema de origen: el .prj de un shapefile es opcional y puede faltar o estar mal asignado, y el DXF no guarda sistema de referencia. El archivo de salida conserva el mismo tipo de coordenadas (y el mismo huso), pero en el datum de destino. Solo se transforma la parte horizontal (X, Y); la coordenada Z no se modifica.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">04</span> Archivos</h2>
+    <label class="dropzone" id="vDrop" for="vFiles">Arrastra aquí tus archivos o haz clic para seleccionarlos<br>
+      <span class="note">Shapefile: el .shp con sus .shx, .dbf, .prj y .cpg (sueltos o dentro de un .zip) · DXF en formato ASCII. El formato DWG no es compatible.</span></label>
+    <input type="file" id="vFiles" multiple accept=".shp,.shx,.dbf,.prj,.cpg,.zip,.dxf" style="display:none;">
+    <div class="filelist" id="vFileList"></div>
+    <div class="row" style="margin-top:14px;"><button class="btn" id="vBtnRun" disabled>Transformar archivos</button></div>
+    <p class="note" id="vProgress"></p>
+  </div>
+
+  <div class="card hide" id="vResultCard">
+    <h2><span class="n">05</span> Resultado</h2>
+    <div id="vReport"></div>
+    <div id="vDownloads"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">06</span> Vista previa</h2>
+    <div id="vMapPlaceholder">Transforma un archivo para ver su geometría aquí sobre el mapa.</div>
+    <div id="vMap" class="hide"></div>
+    <div class="legend" id="vMapLegend" style="display:none;">
+      <span><i class="dot dst"></i> Geometría transformada</span>
+    </div>
+    <p class="note" id="vMapNote"></p>
+  </div>
+
+  </div><!-- /toolFiles -->
+
+  <div id="toolDMS" class="hide">
+
+  <div class="card">
+    <h2><span class="n">01</span> Dirección de la conversión</h2>
+    <div class="seg" id="segGDir">
+      <button data-v="toDec" class="active">GMS → Grados decimales</button>
+      <button data-v="toDMS">Grados decimales → GMS</button>
+    </div>
+    <p class="note" id="gNote"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="n">02</span> Modo de entrada y formato de salida</h2>
+    <div class="row">
+      <div class="seg" id="segGMode">
+        <button data-v="single" class="active">Punto único</button>
+        <button data-v="batch">Lote (varios puntos)</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" style="max-width:200px;"><label>Decimales en grados</label>
+        <select id="gDp"><option>4</option><option>5</option><option>6</option><option selected>7</option><option>8</option><option>9</option></select></div>
+      <div class="field" style="max-width:200px;"><label>Decimales en segundos</label>
+        <select id="gSd"><option>0</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
+      <div class="field" style="max-width:220px;"><label>Separador decimal de salida</label>
+        <select id="gSep"><option value="dot" selected>Punto (.)</option><option value="comma">Coma (,)</option></select></div>
+    </div>
+
+    <div id="gPanelSingle">
+      <div class="row">
+        <div class="field"><label id="gLatLbl">Latitud</label><input type="text" id="gLat"></div>
+        <div class="field"><label id="gLonLbl">Longitud</label><input type="text" id="gLon"></div>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <button class="btn" id="gBtnCalc">Convertir</button>
+        <button class="btn ghost small" id="gBtnDemo">Cargar ejemplo</button>
+      </div>
+      <div class="result" id="gResult">
+        <div class="rlabel">RESULTADO</div>
+        <div class="coords" id="gResultCoords"></div>
+        <div class="note" id="gResultNote"></div>
+      </div>
+    </div>
+
+    <div id="gPanelBatch" class="hide">
+      <label id="gBatchLabel"></label>
+      <textarea id="gBatchInput"></textarea>
+      <div class="row" style="margin-top:12px;">
+        <button class="btn" id="gBtnCalcBatch">Convertir lote</button>
+        <label class="btn ghost small" style="cursor:pointer; margin:0;">Cargar archivo (.csv / .txt)<input type="file" id="gFile" accept=".csv,.txt,.tsv,text/plain" style="display:none;"></label>
+        <button class="btn ghost small" id="gBtnDownload" style="display:none;">Descargar CSV</button>
+      </div>
+      <div id="gBatchOut"></div>
+    </div>
+  </div>
+
+  </div><!-- /toolDMS -->
+
+  <div class="card" id="disclaimer">
+    <h2>Descargo de responsabilidad</h2>
+    <p class="note">Esta herramienta se ofrece como apoyo técnico y de divulgación, calculada a partir de los parámetros oficiales PATVEN_98 publicados por el IGVSB / LGFS. No constituye un producto certificado ni sustituye el criterio profesional de un ingeniero geodesta ni el uso de vértices de control oficiales en trabajos formales.</p>
+    <p class="note"><strong>Al utilizar esta aplicación, el usuario acepta que su uso es bajo su exclusiva responsabilidad.</strong> El autor no garantiza la exactitud, vigencia ni idoneidad de los resultados para ningún uso particular, y no asume responsabilidad por decisiones técnicas, legales, catastrales o de deslinde tomadas con base en esta aplicación. Los resultados deben validarse contra puntos de control oficiales antes de aplicarse en proyectos formales, especialmente en trabajos de precisión legal (catastro, deslinde, límites de propiedad).</p>
+    <p class="note">Los cálculos se ejecutan localmente en el navegador y las coordenadas ingresadas y los archivos cargados no se envían a ningún servidor de esta aplicación. El mapa de fondo se carga desde OpenStreetMap, que recibe las solicitudes de imágenes del área visualizada.</p>
+  </div>
+
+  <div class="sources-note">
+    <details>
+      <summary>Fuentes consultadas</summary>
+      <ul>
+        <li>IGVSB / LGFS (Laboratorio de Geodesia Física y Satelital) — Parámetros oficiales de transformación PATVEN_98, La Canoa (PSAD56) → REGVEN (SIRGAS), vigentes desde el 1° de abril de 1999.</li>
+        <li>PDVSA EPM — "Impacto de la implantación del nuevo datum oficial de Venezuela (SIRGAS-REGVEN) en las actividades geodésicas de PDVSA EPM" (vía SIRGAS.org).</li>
+        <li>SIRGAS — Boletín "Actualización del marco de referencia geodésico oficial de Venezuela, REGVEN" (IGVSB / Universidad del Zulia — LGFS).</li>
+        <li>IOGP / EPSG Geodetic Parameter Dataset — Guidance Note 7-2 ("Coordinate Conversions and Transformations including Formulas"), métodos Molodensky-Badekas (EPSG 1034 / 1039 / 1061 / 1062 / 1063), utilizados como caso oficial de validación numérica del modelo.</li>
+        <li>NIMA Technical Report TR8350.2, Department of Defense World Geodetic System 1984 — fórmulas estándar de la transformación de Molodensky.</li>
+        <li>Snyder, J.P. (1987). <em>Map Projections: A Working Manual</em>. U.S. Geological Survey Professional Paper 1395 — fórmulas de la proyección Transversa de Mercator (UTM).</li>
+        <li>ESRI — <em>ESRI Shapefile Technical Description</em> (julio de 1998) y Autodesk — <em>DXF Reference</em> — estructura de los formatos Shapefile y DXF empleada en el módulo de archivos vectoriales.</li>
+        <li>Conversión sexagesimal ⇄ decimal: 1° = 60′ = 3600″; hemisferios N/S (latitud) y E/O (longitud) según la convención usual.</li>
+        <li>PROJ (OSGeo) y base de datos EPSG — operación La Canoa → REGVEN con Molodensky-Badekas y parámetros PATVEN_98, utilizada como verificación cruzada independiente de los cálculos; definiciones de los CRS de destino (.prj).</li>
+      </ul>
+    </details>
+  </div>
+
+  <footer>
+    Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ---------- Ellipsoids ----------
+const ELL = {
+  canoa:  { name:'Hayford Internacional 1924', a: 6378388.0, f: 1/297.0 },
+  regven: { name:'GRS80', a: 6378137.0, f: 1/298.257222101 }
+};
+
+// ---------- PATVEN_98 (CF / coordinate-frame convention) ----------
+const SEC2RAD = Math.PI / (180*3600);
+const PARAMS = {
+  tX: -270.933, tY: 115.599, tZ: -360.226,
+  rX: -5.266*SEC2RAD, rY: -1.238*SEC2RAD, rZ: 2.381*SEC2RAD,
+  dS: -5.109e-6,
+  Xp: 2464351.59, Yp: -5783466.61, Zp: 974809.81
+};
+
+// ---------- Geodetic <-> Geocentric ----------
+function geoToGeocentric(latDeg, lonDeg, h, ell){
+  const lat = latDeg*Math.PI/180, lon = lonDeg*Math.PI/180;
+  const e2 = 2*ell.f - ell.f*ell.f;
+  const N = ell.a / Math.sqrt(1 - e2*Math.sin(lat)*Math.sin(lat));
+  const X = (N+h)*Math.cos(lat)*Math.cos(lon);
+  const Y = (N+h)*Math.cos(lat)*Math.sin(lon);
+  const Z = (N*(1-e2)+h)*Math.sin(lat);
+  return [X,Y,Z];
+}
+function geocentricToGeo(X,Y,Z, ell){
+  const e2 = 2*ell.f - ell.f*ell.f;
+  const lon = Math.atan2(Y,X);
+  const p = Math.sqrt(X*X+Y*Y);
+  let lat = Math.atan2(Z, p*(1-e2));
+  let N, h;
+  for(let i=0;i<6;i++){
+    N = ell.a / Math.sqrt(1 - e2*Math.sin(lat)*Math.sin(lat));
+    h = p/Math.cos(lat) - N;
+    lat = Math.atan2(Z, p*(1 - e2*N/(N+h)));
+  }
+  N = ell.a / Math.sqrt(1 - e2*Math.sin(lat)*Math.sin(lat));
+  h = p/Math.cos(lat) - N;
+  return [lat*180/Math.PI, lon*180/Math.PI, h];
+}
+
+// ---------- Molodensky-Badekas / Bursa-Wolf (forward: Canoa -> REGVEN) ----------
+// pf = {Xp,Yp,Zp} punto de rotación. Molodensky-Badekas usa el Punto Fundamental;
+// Bursa-Wolf usa el geocentro (0,0,0) como si fuese un caso particular con PF=0.
+function similarityForward(X,Y,Z, pf){
+  const dX = X-pf.Xp, dY = Y-pf.Yp, dZ = Z-pf.Zp;
+  const M = 1 + PARAMS.dS;
+  const {rX,rY,rZ} = PARAMS;
+  const rdX = dX + rZ*dY - rY*dZ;
+  const rdY = -rZ*dX + dY + rX*dZ;
+  const rdZ = rY*dX - rX*dY + dZ;
+  return [
+    pf.Xp + PARAMS.tX + M*rdX,
+    pf.Yp + PARAMS.tY + M*rdY,
+    pf.Zp + PARAMS.tZ + M*rdZ
+  ];
+}
+function mat3Inverse(m){
+  const [a,b,c,d,e,f,g,h,i] = m;
+  const A = e*i-f*h, B = -(d*i-f*g), C = d*h-e*g;
+  const D = -(b*i-c*h), E = a*i-c*g, F = -(a*h-b*g);
+  const G = b*f-c*e, H = -(a*f-c*d), I = a*e-b*d;
+  const det = a*A + b*B + c*C;
+  return [A/det,D/det,G/det, B/det,E/det,H/det, C/det,F/det,I/det];
+}
+function similarityInverse(Xt,Yt,Zt, pf){
+  const M = 1 + PARAMS.dS;
+  const {rX,rY,rZ} = PARAMS;
+  const R = [1,rZ,-rY, -rZ,1,rX, rY,-rX,1];
+  const A = R.map(v=>v*M);
+  const Ainv = mat3Inverse(A);
+  const bx = Xt-pf.Xp-PARAMS.tX, by = Yt-pf.Yp-PARAMS.tY, bz = Zt-pf.Zp-PARAMS.tZ;
+  const dX = Ainv[0]*bx+Ainv[1]*by+Ainv[2]*bz;
+  const dY = Ainv[3]*bx+Ainv[4]*by+Ainv[5]*bz;
+  const dZ = Ainv[6]*bx+Ainv[7]*by+Ainv[8]*bz;
+  return [pf.Xp+dX, pf.Yp+dY, pf.Zp+dZ];
+}
+const PF_MB = {Xp:PARAMS.Xp, Yp:PARAMS.Yp, Zp:PARAMS.Zp};
+const PF_GEOCENTER = {Xp:0, Yp:0, Zp:0};
+
+// ---------- Molodensky estándar (3 parámetros, directo sobre lat/lon/h) ----------
+// Fórmula estándar de Molodensky (EPSG 9604 / NIMA TR8350.2). Solo usa las
+// traslaciones de PATVEN_98; rotaciones y escala se asumen cero, tal como
+// recomienda el IGVSB/LGFS para escalas 1:2.000.000 - 1:10.000.
+function molodenskyStandard(latDeg, lonDeg, h, ellSrc, ellDst, dX, dY, dZ){
+  const lat = latDeg*Math.PI/180, lon = lonDeg*Math.PI/180;
+  const a1 = ellSrc.a, f1 = ellSrc.f, b1 = a1*(1-f1);
+  const a2 = ellDst.a, f2 = ellDst.f;
+  const da = a2-a1, df = f2-f1;
+  const e2 = 2*f1 - f1*f1;
+  const sinLat=Math.sin(lat), cosLat=Math.cos(lat), sinLon=Math.sin(lon), cosLon=Math.cos(lon);
+  const N = a1/Math.sqrt(1-e2*sinLat*sinLat);
+  const M = a1*(1-e2)/Math.pow(1-e2*sinLat*sinLat,1.5);
+  const dLat = (-dX*sinLat*cosLon - dY*sinLat*sinLon + dZ*cosLat
+    + da*(N*e2*sinLat*cosLat)/a1 + df*(M*(a1/b1)+N*(b1/a1))*sinLat*cosLat) / (M+h);
+  const dLon = (-dX*sinLon + dY*cosLon) / ((N+h)*cosLat);
+  const dh = dX*cosLat*cosLon + dY*cosLat*sinLon + dZ*sinLat - da*(a1/N) + df*(b1/a1)*N*sinLat*sinLat;
+  return [ latDeg + dLat*180/Math.PI, lonDeg + dLon*180/Math.PI, h+dh ];
+}
+
+// ---------- UTM <-> Geographic (Snyder) ----------
+function zoneLon0(zone){ return -183 + 6*zone; }
+const K0 = 0.9996, FE = 500000;
+
+function geoToUTM(latDeg, lonDeg, zone, ell){
+  const lat = latDeg*Math.PI/180, lon0 = zoneLon0(zone)*Math.PI/180, lon = lonDeg*Math.PI/180;
+  const a = ell.a, f = ell.f, e2 = 2*f-f*f, ep2 = e2/(1-e2);
+  const N = a/Math.sqrt(1-e2*Math.sin(lat)**2);
+  const T = Math.tan(lat)**2;
+  const C = ep2*Math.cos(lat)**2;
+  const Am = (lon-lon0)*Math.cos(lat);
+  const M = a*((1-e2/4-3*e2*e2/64-5*e2**3/256)*lat
+    -(3*e2/8+3*e2*e2/32+45*e2**3/1024)*Math.sin(2*lat)
+    +(15*e2*e2/256+45*e2**3/1024)*Math.sin(4*lat)
+    -(35*e2**3/3072)*Math.sin(6*lat));
+  const E = K0*N*(Am + (1-T+C)*Am**3/6 + (5-18*T+T*T+72*C-58*ep2)*Am**5/120) + FE;
+  const Nn = K0*(M + N*Math.tan(lat)*(Am*Am/2 + (5-T+9*C+4*C*C)*Am**4/24 + (61-58*T+T*T+600*C-330*ep2)*Am**6/720));
+  return [E, Nn];
+}
+function utmToGeo(E, Nn, zone, ell){
+  const a = ell.a, f = ell.f, e2 = 2*f-f*f, ep2 = e2/(1-e2);
+  const e1 = (1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const M = Nn/K0;
+  const mu = M/(a*(1-e2/4-3*e2*e2/64-5*e2**3/256));
+  const phi1 = mu + (3*e1/2-27*e1**3/32)*Math.sin(2*mu) + (21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)
+    + (151*e1**3/96)*Math.sin(6*mu) + (1097*e1**4/512)*Math.sin(8*mu);
+  const C1 = ep2*Math.cos(phi1)**2;
+  const T1 = Math.tan(phi1)**2;
+  const N1 = a/Math.sqrt(1-e2*Math.sin(phi1)**2);
+  const R1 = a*(1-e2)/Math.pow(1-e2*Math.sin(phi1)**2,1.5);
+  const D = (E-FE)/(N1*K0);
+  const lat = phi1 - (N1*Math.tan(phi1)/R1)*(D*D/2 - (5+3*T1+10*C1-4*C1*C1-9*ep2)*D**4/24
+    + (61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D**6/720);
+  const lon0 = zoneLon0(zone)*Math.PI/180;
+  const lon = lon0 + (D - (1+2*T1+C1)*D**3/6 + (5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D**5/120)/Math.cos(phi1);
+  return [lat*180/Math.PI, lon*180/Math.PI];
+}
+
+// ---------- High-level transform ----------
+function transformPoint(input, fmt, zone, direction, model){
+  // input: {lat,lon,h} or {e,n,h}; returns {out fmt same as input}, plus lat/lon both sides
+  const ellSrc = direction==='toRegven' ? ELL.canoa : ELL.regven;
+  const ellDst = direction==='toRegven' ? ELL.regven : ELL.canoa;
+
+  let latS, lonS, hS;
+  if(fmt==='utm'){
+    [latS, lonS] = utmToGeo(input.e, input.n, zone, ellSrc);
+    hS = input.h||0;
+  } else {
+    latS = input.lat; lonS = input.lon; hS = input.h||0;
+  }
+
+  let latD, lonD, hD;
+  if(model==='molodensky'){
+    const sign = direction==='toRegven' ? 1 : -1;
+    [latD, lonD, hD] = molodenskyStandard(latS, lonS, hS, ellSrc, ellDst,
+      sign*PARAMS.tX, sign*PARAMS.tY, sign*PARAMS.tZ);
+  } else {
+    const pf = model==='bursa' ? PF_GEOCENTER : PF_MB;
+    const [X,Y,Z] = geoToGeocentric(latS, lonS, hS, ellSrc);
+    const [Xt,Yt,Zt] = direction==='toRegven' ? similarityForward(X,Y,Z,pf) : similarityInverse(X,Y,Z,pf);
+    [latD, lonD, hD] = geocentricToGeo(Xt,Yt,Zt, ellDst);
+  }
+
+  let out = {lat:latD, lon:lonD, h:hD, srcLat:latS, srcLon:lonS};
+  if(fmt==='utm'){
+    const [E,N] = geoToUTM(latD, lonD, zone, ellDst);
+    out.e = E; out.n = N;
+  }
+  return out;
+}
+
+// ---------- Map ----------
+let mapInst = null, mapLayer = null;
+function ensureMap(){
+  document.getElementById('mapPlaceholder').classList.add('hide');
+  document.getElementById('map').classList.remove('hide');
+  document.getElementById('mapLegend').style.display = 'flex';
+  if(!mapInst){
+    mapInst = L.map('map', {scrollWheelZoom:false}).setView([8.0, -66.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap',
+      maxZoom: 18
+    }).addTo(mapInst);
+  }
+  if(mapLayer){ mapInst.removeLayer(mapLayer); }
+  mapLayer = L.layerGroup().addTo(mapInst);
+  return mapLayer;
+}
+function srcIcon(){
+  return L.divIcon({className:'', html:'<div style="width:13px;height:13px;border-radius:50%;background:var(--muted);border:2px solid var(--panel);"></div>', iconSize:[13,13], iconAnchor:[7,7]});
+}
+function dstIcon(){
+  return L.divIcon({className:'', html:'<div style="width:13px;height:13px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);"></div>', iconSize:[13,13], iconAnchor:[7,7]});
+}
+// Si la librería de mapas no carga (sin conexión, CDN bloqueado), el cálculo no debe verse afectado.
+function mapUnavailable(placeholderId, mapId, legendId){
+  const ph = document.getElementById(placeholderId);
+  ph.textContent = 'Mapa no disponible: no se pudo cargar la librería de mapas (¿sin conexión?). Los resultados numéricos no se ven afectados.';
+  ph.classList.remove('hide');
+  document.getElementById(mapId).classList.add('hide');
+  document.getElementById(legendId).style.display = 'none';
+}
+function plotSingle(out, direction){
+  try{
+  const layer = ensureMap();
+  const dstLabel = direction==='toRegven' ? 'REGVEN (SIRGAS)' : 'Canoa (PSAD56)';
+  const p2 = L.marker([out.lat, out.lon], {icon:dstIcon()})
+    .bindPopup(`<b>Destino — ${dstLabel}</b><br>${out.lat.toFixed(6)}, ${out.lon.toFixed(6)}`);
+  layer.addLayer(p2);
+  mapInst.setView([out.lat, out.lon], 14);
+  setTimeout(()=>mapInst.invalidateSize(), 150);
+  }catch(e){ mapUnavailable('mapPlaceholder','map','mapLegend'); }
+}
+function plotBatch(rows, direction){
+  try{
+  const layer = ensureMap();
+  const dstLabel = direction==='toRegven' ? 'REGVEN (SIRGAS)' : 'Canoa (PSAD56)';
+  const bounds = [];
+  rows.forEach(r=>{
+    L.marker([r.lat, r.lon], {icon:dstIcon()}).bindPopup(`<b>${r.id} — Destino (${dstLabel})</b><br>${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}`).addTo(layer);
+    bounds.push([r.lat, r.lon]);
+  });
+  if(bounds.length){
+    mapInst.fitBounds(L.latLngBounds(bounds).pad(0.3), {maxZoom:15});
+  }
+  setTimeout(()=>mapInst.invalidateSize(), 150);
+  }catch(e){ mapUnavailable('mapPlaceholder','map','mapLegend'); }
+}
+
+// ---------- UI wiring ----------
+function seg(id, cb){
+  const el = document.getElementById(id);
+  el.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      el.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      cb(btn.dataset.v);
+    });
+  });
+}
+
+let state = { dir:'toRegven', mode:'single', fmt:'utm', model:'mb' };
+
+seg('segModel', v=>{ state.model=v; updateModelUI(); });
+seg('segDir', v=>{ state.dir=v; updateScaleNote(); updateModelUI(); });
+seg('segMode', v=>{
+  state.mode=v;
+  document.getElementById('panelSingle').classList.toggle('hide', v!=='single');
+  document.getElementById('panelBatch').classList.toggle('hide', v!=='batch');
+});
+seg('segFmt', v=>{
+  state.fmt=v;
+  document.getElementById('utmSingle').classList.toggle('hide', v!=='utm');
+  document.getElementById('geoSingle').classList.toggle('hide', v!=='geo');
+  document.getElementById('batchLabel').innerHTML = v==='utm'
+    ? 'Pega las coordenadas — una por línea, separadas por coma:<br>id,huso,este,norte,altura(opcional)'
+    : 'Pega las coordenadas — una por línea, separadas por coma:<br>id,latitud,longitud,altura(opcional)';
+  document.getElementById('batchInput').placeholder = v==='utm'
+    ? 'P1,19,354996.000,1058467.000,0\nP2,19,355210.500,1058390.200,0'
+    : 'P1,9.583441,-66.080025,0\nP2,9.581900,-66.078500,0';
+});
+
+function fmtNum(n, dp){ return n.toLocaleString('es-VE',{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function toDMS(deg, isLat){
+  const hem = isLat ? (deg>=0?'N':'S') : (deg>=0?'E':'O');
+  const abs = Math.abs(deg);
+  let d = Math.floor(abs);
+  let mFull = (abs-d)*60;
+  let m = Math.floor(mFull);
+  let s = (mFull-m)*60;
+  // corrección de redondeo (60.000" -> siguiente minuto/grado)
+  if(s >= 59.9995){ s = 0; m += 1; }
+  if(m >= 60){ m = 0; d += 1; }
+  return `${d}°${String(m).padStart(2,'0')}'${s.toFixed(3).padStart(6,'0')}"${hem}`;
+}
+// Misma conversión pero con letras (d/m/s) en vez de símbolos °'" — para uso en archivos CSV,
+// donde la comilla doble rompe el formato (RFC 4180) y el símbolo ° depende de la codificación.
+function toDMSFile(deg, isLat){
+  const hem = isLat ? (deg>=0?'N':'S') : (deg>=0?'E':'O');
+  const abs = Math.abs(deg);
+  let d = Math.floor(abs);
+  let mFull = (abs-d)*60;
+  let m = Math.floor(mFull);
+  let s = (mFull-m)*60;
+  if(s >= 59.9995){ s = 0; m += 1; }
+  if(m >= 60){ m = 0; d += 1; }
+  return `${d}d${String(m).padStart(2,'0')}m${s.toFixed(3).padStart(6,'0')}s${hem}`;
+}
+
+function updateScaleNote(){
+  document.getElementById('scaleNote').textContent =
+    'La exactitud depende del modelo elegido y de la zona de trabajo. Para trabajos de precisión o de carácter legal, valide los resultados contra vértices de control oficiales cercanos al área de trabajo.';
+}
+updateScaleNote();
+
+const MODEL_INFO = {
+  mb: {
+    label: 'Molodensky-Badekas (10 parámetros + Punto Fundamental)',
+    note: 'Recomendado para escalas ≥ 1:10.000. Aplica traslaciones, rotaciones y escala de PATVEN_98 en torno al Punto Fundamental, evitando la distorsión que produce el Bursa-Wolf puro fuera de la zona de ajuste.',
+    footer: 'Fuente: IGVSB / LGFS, parámetros oficiales PATVEN_98. El uso del Punto Fundamental evita la distorsión que introduce aplicar los 7 parámetros oficiales en un modelo Bursa-Wolf puro (sin punto de referencia).'
+  },
+  molodensky: {
+    label: 'Molodensky estándar (3 parámetros)',
+    note: 'Recomendado para escalas entre 1:2.000.000 y 1:10.000. Usa solo las traslaciones oficiales de PATVEN_98; rotaciones y escala se asumen en cero, tal como recomienda el IGVSB/LGFS. Trabaja directamente sobre latitud/longitud, sin pasar por coordenadas geocéntricas.',
+    footer: 'Modelo abreviado (EPSG 9604 / NIMA TR8350.2) con ΔX=−270.933, ΔY=+115.599, ΔZ=−360.226 m, rotaciones y escala = 0.'
+  },
+  bursa: {
+    label: 'Bursa-Wolf (7 parámetros, geocéntrico puro)',
+    note: 'Aplica los 7 parámetros oficiales de PATVEN_98 rotando en torno al geocentro, sin Punto Fundamental. El propio IGVSB advierte que esto es un error fuera de la zona de ajuste — inclúyelo solo por compatibilidad con software que no soporte Punto Fundamental, o para comparar contra Molodensky-Badekas.',
+    footer: 'Mismos 7 parámetros que Molodensky-Badekas, pero con punto de rotación en el geocentro (0,0,0) en vez del Punto Fundamental.'
+  }
+};
+
+function updateModelUI(){
+  const info = MODEL_INFO[state.model];
+  document.getElementById('modelNote').textContent = info.note;
+  document.getElementById('paramsSummary').textContent = `Ver parámetros aplicados — ${info.label}`;
+  document.getElementById('paramsFooterNote').textContent = info.footer;
+
+  let grid = '';
+  const addRow = (k,v) => grid += `<div><span>${k}</span> ${v}</div>`;
+  addRow('Modelo', info.label);
+  if(state.model==='molodensky'){
+    addRow('ΔX', '−270.933 m');
+    addRow('ΔY', '+115.599 m');
+    addRow('ΔZ', '−360.226 m');
+    addRow('Rotaciones', '0 (no aplica)');
+    addRow('Factor de escala', '0 ppm (no aplica)');
+  } else {
+    addRow('ΔX', '−270.933 m');
+    addRow('ΔY', '+115.599 m');
+    addRow('ΔZ', '−360.226 m');
+    addRow('Rotación X (εX)', '−5.266″');
+    addRow('Rotación Y (εY)', '−1.238″');
+    addRow('Rotación Z (εZ)', '+2.381″');
+    addRow('Factor de escala (ΔS)', '−5.109 ppm');
+    if(state.model==='mb'){
+      addRow('Punto Fundamental Xp', '2 464 351.590 m');
+      addRow('Punto Fundamental Yp', '−5 783 466.610 m');
+      addRow('Punto Fundamental Zp', '974 809.810 m');
+    } else {
+      addRow('Punto de rotación', 'Geocentro (0, 0, 0)');
+    }
+  }
+  addRow('Elipsoide La Canoa', 'Hayford Internacional 1924 (a=6 378 388.000, 1/f=297.0)');
+  addRow('Elipsoide REGVEN', 'GRS80 (a=6 378 137.000, 1/f=298.257222101)');
+  document.getElementById('paramsGrid').innerHTML = grid;
+}
+updateModelUI();
+
+document.getElementById('btnCalc').addEventListener('click', ()=>{
+  let input = {};
+  const zone = parseInt(document.getElementById('s_zone').value);
+  try{
+    if(state.fmt==='utm'){
+      input.e = parseFloat(document.getElementById('s_e').value);
+      input.n = parseFloat(document.getElementById('s_n').value);
+      input.h = parseFloat(document.getElementById('s_h_utm').value)||0;
+      if(isNaN(input.e)||isNaN(input.n)) throw new Error('Ingresa Este y Norte.');
+    } else {
+      input.lat = parseFloat(document.getElementById('s_lat').value);
+      input.lon = parseFloat(document.getElementById('s_lon').value);
+      input.h = parseFloat(document.getElementById('s_h_geo').value)||0;
+      if(isNaN(input.lat)||isNaN(input.lon)) throw new Error('Ingresa latitud y longitud.');
+    }
+    const out = transformPoint(input, state.fmt, zone, state.dir, state.model);
+    const target = state.dir==='toRegven' ? 'REGVEN (SIRGAS)' : 'La Canoa (PSAD56)';
+    let html = '';
+    if(state.fmt==='utm'){
+      html += `<div><span class="k">Huso ${zone}N —</span> <span class="v">Este:</span> <span class="v">${fmtNum(out.e,3)} m</span></div>`;
+      html += `<div><span class="v">Norte:</span> <span class="v">${fmtNum(out.n,3)} m</span></div>`;
+    }
+    html += `<div><span class="k">Latitud:</span> <span class="v">${out.lat.toFixed(7)}°</span> <span class="k">(${toDMS(out.lat,true)})</span></div>`;
+    html += `<div><span class="k">Longitud:</span> <span class="v">${out.lon.toFixed(7)}°</span> <span class="k">(${toDMS(out.lon,false)})</span></div>`;
+    html += `<div><span class="k">Altura elipsoidal:</span> <span class="v">${fmtNum(out.h,3)} m</span></div>`;
+    document.getElementById('resultCoords').innerHTML = html;
+    document.getElementById('resultNote').textContent = `Sistema destino: ${target} · Modelo: ${MODEL_INFO[state.model].label}.`;
+    document.getElementById('result').classList.add('show');
+    plotSingle(out, state.dir);
+  }catch(e){
+    document.getElementById('resultCoords').innerHTML = `<div style="color:var(--warn)">${e.message}</div>`;
+    document.getElementById('resultNote').textContent = '';
+    document.getElementById('result').classList.add('show');
+  }
+});
+
+document.getElementById('btnDemo').addEventListener('click', ()=>{
+  // EPSG official worked example for La Canoa -> REGVEN (Molodensky-Badekas, CF domain)
+  document.querySelectorAll('#segModel button')[0].click(); // Molodensky-Badekas
+  document.querySelectorAll('#segDir button')[0].click();
+  document.querySelectorAll('#segFmt button')[1].click(); // geo
+  document.getElementById('s_lat').value = '9.583440556';   // 9°35'00.386"N
+  document.getElementById('s_lon').value = '-66.080025278'; // 66°04'48.091"W
+  document.getElementById('s_h_geo').value = '201.465';
+});
+
+let lastBatchRows = null;
+document.getElementById('btnCalcBatch').addEventListener('click', ()=>{
+  const lines = document.getElementById('batchInput').value.trim().split('\n').filter(l=>l.trim());
+  const zone = parseInt(document.getElementById('s_zone').value) || 19;
+  const rows = [];
+  const target = state.dir==='toRegven' ? 'REGVEN' : 'Canoa';
+  const src = state.dir==='toRegven' ? 'Canoa' : 'REGVEN';
+  for(const line of lines){
+    const parts = line.split(',').map(s=>s.trim());
+    if(parts.length<3) continue;
+    const id = parts[0];
+    let out, inZone = zone;
+    try{
+      if(state.fmt==='utm'){
+        inZone = parseInt(parts[1]);
+        const e = parseFloat(parts[2]), n = parseFloat(parts[3]), h = parseFloat(parts[4])||0;
+        out = transformPoint({e,n,h}, 'utm', inZone, state.dir, state.model);
+        rows.push({id, zone:inZone, in_e:e, in_n:n, out_e:out.e, out_n:out.n, lat:out.lat, lon:out.lon, h:out.h, srcLat:out.srcLat, srcLon:out.srcLon});
+      } else {
+        const lat = parseFloat(parts[1]), lon = parseFloat(parts[2]), h = parseFloat(parts[3])||0;
+        out = transformPoint({lat,lon,h}, 'geo', inZone, state.dir, state.model);
+        rows.push({id, in_lat:lat, in_lon:lon, lat:out.lat, lon:out.lon, h:out.h, srcLat:out.srcLat, srcLon:out.srcLon});
+      }
+    }catch(e){ /* skip bad row */ }
+  }
+  lastBatchRows = rows;
+  renderBatch(rows);
+  document.getElementById('btnDownload').style.display = rows.length ? 'inline-block' : 'none';
+  if(rows.length) plotBatch(rows, state.dir);
+});
+
+function renderBatch(rows){
+  const out = document.getElementById('batchOut');
+  if(!rows.length){ out.innerHTML = '<p class="note">No se detectaron filas válidas.</p>'; return; }
+  let head, body='';
+  if(state.fmt==='utm'){
+    head = `<tr><th>ID</th><th>Huso</th><th>Este destino</th><th>Norte destino</th><th>Lat (dec)</th><th>Lat (GMS)</th><th>Lon (dec)</th><th>Lon (GMS)</th></tr>`;
+    rows.forEach(r=>{
+      body += `<tr><td>${r.id}</td><td>${r.zone}N</td><td>${fmtNum(r.out_e,3)}</td><td>${fmtNum(r.out_n,3)}</td><td>${r.lat.toFixed(6)}</td><td>${toDMS(r.lat,true)}</td><td>${r.lon.toFixed(6)}</td><td>${toDMS(r.lon,false)}</td></tr>`;
+    });
+  } else {
+    head = `<tr><th>ID</th><th>Lat (dec)</th><th>Lat (GMS)</th><th>Lon (dec)</th><th>Lon (GMS)</th><th>Altura (m)</th></tr>`;
+    rows.forEach(r=>{
+      body += `<tr><td>${r.id}</td><td>${r.lat.toFixed(7)}</td><td>${toDMS(r.lat,true)}</td><td>${r.lon.toFixed(7)}</td><td>${toDMS(r.lon,false)}</td><td>${fmtNum(r.h,3)}</td></tr>`;
+    });
+  }
+  out.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+document.getElementById('btnDownload').addEventListener('click', ()=>{
+  if(!lastBatchRows) return;
+  let csv;
+  if(state.fmt==='utm'){
+    csv = 'id,huso,este_destino,norte_destino,lat_destino_decimal,lon_destino_decimal,lat_destino_gms,lon_destino_gms\n' +
+      lastBatchRows.map(r=>`${r.id},${r.zone},${r.out_e.toFixed(3)},${r.out_n.toFixed(3)},${r.lat.toFixed(7)},${r.lon.toFixed(7)},${toDMSFile(r.lat,true)},${toDMSFile(r.lon,false)}`).join('\n');
+  } else {
+    csv = 'id,lat_destino_decimal,lon_destino_decimal,lat_destino_gms,lon_destino_gms,altura\n' +
+      lastBatchRows.map(r=>`${r.id},${r.lat.toFixed(7)},${r.lon.toFixed(7)},${toDMSFile(r.lat,true)},${toDMSFile(r.lon,false)},${r.h.toFixed(3)}`).join('\n');
+  }
+  const srcLabel = state.dir==='toRegven' ? 'La Canoa (PSAD56)' : 'REGVEN (SIRGAS)';
+  const dstLabel = state.dir==='toRegven' ? 'REGVEN (SIRGAS)' : 'La Canoa (PSAD56)';
+  const modelLabelPlain = MODEL_INFO[state.model].label.replace(/,/g, ' -');
+  csv += `\n\nSentido de la transformacion: ${srcLabel} a ${dstLabel} | Modelo empleado: ${modelLabelPlain}`;
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'transformacion_datum.csv';
+  a.click();
+});
+
+// ========== MÓDULO: Conversión UTM ⇄ Geográficas (sin cambio de datum) ==========
+seg('segTool', v=>{
+  document.getElementById('toolDatum').classList.toggle('hide', v!=='datum');
+  document.getElementById('toolUTM').classList.toggle('hide', v!=='utm');
+  document.getElementById('toolFiles').classList.toggle('hide', v!=='files');
+  document.getElementById('toolDMS').classList.toggle('hide', v!=='dms');
+  setTimeout(()=>{
+    if(v==='utm' && uMapInst) uMapInst.invalidateSize();
+    else if(v==='files' && typeof vMapInst!=='undefined' && vMapInst) vMapInst.invalidateSize();
+    else if(v==='datum' && mapInst) mapInst.invalidateSize();
+  }, 150);
+});
+
+let uState = { datum:'canoa', dir:'toGeo', mode:'single' };
+
+seg('segUDatum', v=>{ uState.datum=v; });
+seg('segUDir', v=>{
+  uState.dir=v;
+  document.getElementById('uUtmSingle').classList.toggle('hide', v!=='toGeo');
+  document.getElementById('uGeoSingle').classList.toggle('hide', v!=='toUTM');
+  document.getElementById('uBatchLabel').innerHTML = v==='toGeo'
+    ? 'Pega las coordenadas — una por línea, separadas por coma:<br>id,huso,este,norte,altura(opcional)'
+    : 'Pega las coordenadas — una por línea, separadas por coma:<br>id,latitud,longitud,huso_destino,altura(opcional)';
+  document.getElementById('uBatchInput').placeholder = v==='toGeo'
+    ? 'P1,19,354996.000,1058467.000,0\nP2,19,355210.500,1058390.200,0'
+    : 'P1,9.583441,-66.080025,19,0\nP2,9.581900,-66.078500,19,0';
+});
+seg('segUMode', v=>{
+  uState.mode=v;
+  document.getElementById('uPanelSingle').classList.toggle('hide', v!=='single');
+  document.getElementById('uPanelBatch').classList.toggle('hide', v!=='batch');
+});
+
+let uMapInst=null, uMapLayer=null;
+function ensureUMap(){
+  document.getElementById('uMapPlaceholder').classList.add('hide');
+  document.getElementById('uMap').classList.remove('hide');
+  document.getElementById('uMapLegend').style.display='flex';
+  if(!uMapInst){
+    uMapInst = L.map('uMap', {scrollWheelZoom:false}).setView([8.0,-66.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:18}).addTo(uMapInst);
+  }
+  if(uMapLayer){ uMapInst.removeLayer(uMapLayer); }
+  uMapLayer = L.layerGroup().addTo(uMapInst);
+  return uMapLayer;
+}
+
+document.getElementById('uBtnCalc').addEventListener('click', ()=>{
+  const ell = ELL[uState.datum];
+  const datumLabel = uState.datum==='canoa' ? 'La Canoa (PSAD56)' : 'REGVEN (SIRGAS)';
+  try{
+    let html='', lat, lon;
+    if(uState.dir==='toGeo'){
+      const zone = parseInt(document.getElementById('u_s_zone').value);
+      const e = parseFloat(document.getElementById('u_s_e').value);
+      const n = parseFloat(document.getElementById('u_s_n').value);
+      const h = parseFloat(document.getElementById('u_s_h').value)||0;
+      if(isNaN(e)||isNaN(n)) throw new Error('Ingresa Este y Norte.');
+      [lat, lon] = utmToGeo(e, n, zone, ell);
+      html += `<div><span class="k">Latitud:</span> <span class="v">${lat.toFixed(7)}°</span> <span class="k">(${toDMS(lat,true)})</span></div>`;
+      html += `<div><span class="k">Longitud:</span> <span class="v">${lon.toFixed(7)}°</span> <span class="k">(${toDMS(lon,false)})</span></div>`;
+      html += `<div><span class="k">Altura:</span> <span class="v">${fmtNum(h,3)} m</span></div>`;
+    } else {
+      lat = parseFloat(document.getElementById('u_s_lat').value);
+      lon = parseFloat(document.getElementById('u_s_lon').value);
+      const zone = parseInt(document.getElementById('u_s_zoneOut').value);
+      const h = parseFloat(document.getElementById('u_s_h_geo').value)||0;
+      if(isNaN(lat)||isNaN(lon)) throw new Error('Ingresa latitud y longitud.');
+      const [E,N] = geoToUTM(lat, lon, zone, ell);
+      html += `<div><span class="k">Huso ${zone}N —</span> <span class="v">Este:</span> <span class="v">${fmtNum(E,3)} m</span></div>`;
+      html += `<div><span class="v">Norte:</span> <span class="v">${fmtNum(N,3)} m</span></div>`;
+      html += `<div><span class="k">Altura:</span> <span class="v">${fmtNum(h,3)} m</span></div>`;
+    }
+    document.getElementById('uResultCoords').innerHTML = html;
+    document.getElementById('uResultNote').textContent = `Sistema: ${datumLabel} · Conversión de proyección únicamente, sin cambio de datum.`;
+    document.getElementById('uResult').classList.add('show');
+    try{
+      const layer = ensureUMap();
+      L.marker([lat,lon], {icon:dstIcon()}).bindPopup(`<b>Resultado — ${datumLabel}</b><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`).addTo(layer);
+      uMapInst.setView([lat,lon], 14);
+      setTimeout(()=>uMapInst.invalidateSize(), 150);
+    }catch(e){ mapUnavailable('uMapPlaceholder','uMap','uMapLegend'); }
+  }catch(e){
+    document.getElementById('uResultCoords').innerHTML = `<div style="color:var(--warn)">${e.message}</div>`;
+    document.getElementById('uResultNote').textContent = '';
+    document.getElementById('uResult').classList.add('show');
+  }
+});
+
+let uLastBatchRows = null;
+document.getElementById('uBtnCalcBatch').addEventListener('click', ()=>{
+  const ell = ELL[uState.datum];
+  const lines = document.getElementById('uBatchInput').value.trim().split('\n').filter(l=>l.trim());
+  const rows = [];
+  for(const line of lines){
+    const parts = line.split(',').map(s=>s.trim());
+    if(parts.length<3) continue;
+    const id = parts[0];
+    try{
+      if(uState.dir==='toGeo'){
+        const zone = parseInt(parts[1]);
+        const e = parseFloat(parts[2]), n = parseFloat(parts[3]), h = parseFloat(parts[4])||0;
+        const [lat,lon] = utmToGeo(e, n, zone, ell);
+        rows.push({id, lat, lon, h});
+      } else {
+        const lat = parseFloat(parts[1]), lon = parseFloat(parts[2]), zone = parseInt(parts[3]), h = parseFloat(parts[4])||0;
+        const [E,N] = geoToUTM(lat, lon, zone, ell);
+        rows.push({id, lat, lon, zone, e:E, n:N, h});
+      }
+    }catch(e){ /* skip bad row */ }
+  }
+  uLastBatchRows = rows;
+  renderUBatch(rows);
+  document.getElementById('uBtnDownload').style.display = rows.length ? 'inline-block' : 'none';
+  if(rows.length){
+    try{
+      const layer = ensureUMap();
+      const bounds = [];
+      rows.forEach(r=>{
+        L.marker([r.lat,r.lon], {icon:dstIcon()}).bindPopup(`<b>${r.id}</b><br>${r.lat.toFixed(6)}, ${r.lon.toFixed(6)}`).addTo(layer);
+        bounds.push([r.lat,r.lon]);
+      });
+      uMapInst.fitBounds(L.latLngBounds(bounds).pad(0.3), {maxZoom:15});
+      setTimeout(()=>uMapInst.invalidateSize(), 150);
+    }catch(e){ mapUnavailable('uMapPlaceholder','uMap','uMapLegend'); }
+  }
+});
+
+function renderUBatch(rows){
+  const out = document.getElementById('uBatchOut');
+  if(!rows.length){ out.innerHTML = '<p class="note">No se detectaron filas válidas.</p>'; return; }
+  let head, body='';
+  if(uState.dir==='toGeo'){
+    head = `<tr><th>ID</th><th>Lat (dec)</th><th>Lat (GMS)</th><th>Lon (dec)</th><th>Lon (GMS)</th><th>Altura (m)</th></tr>`;
+    rows.forEach(r=>{ body += `<tr><td>${r.id}</td><td>${r.lat.toFixed(7)}</td><td>${toDMS(r.lat,true)}</td><td>${r.lon.toFixed(7)}</td><td>${toDMS(r.lon,false)}</td><td>${fmtNum(r.h,3)}</td></tr>`; });
+  } else {
+    head = `<tr><th>ID</th><th>Huso</th><th>Este</th><th>Norte</th></tr>`;
+    rows.forEach(r=>{ body += `<tr><td>${r.id}</td><td>${r.zone}N</td><td>${fmtNum(r.e,3)}</td><td>${fmtNum(r.n,3)}</td></tr>`; });
+  }
+  out.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+document.getElementById('uBtnDownload').addEventListener('click', ()=>{
+  if(!uLastBatchRows) return;
+  let csv;
+  if(uState.dir==='toGeo'){
+    csv = 'id,lat_decimal,lon_decimal,lat_gms,lon_gms,altura\n' +
+      uLastBatchRows.map(r=>`${r.id},${r.lat.toFixed(7)},${r.lon.toFixed(7)},${toDMSFile(r.lat,true)},${toDMSFile(r.lon,false)},${r.h.toFixed(3)}`).join('\n');
+  } else {
+    csv = 'id,huso,este,norte\n' + uLastBatchRows.map(r=>`${r.id},${r.zone},${r.e.toFixed(3)},${r.n.toFixed(3)}`).join('\n');
+  }
+  const datumLabel = uState.datum==='canoa' ? 'La Canoa (PSAD56)' : 'REGVEN (SIRGAS)';
+  const dirLabel = uState.dir==='toGeo' ? 'UTM a Geograficas' : 'Geograficas a UTM';
+  csv += `\n\nSentido de la conversion: ${dirLabel} | Datum/elipsoide: ${datumLabel} | Sin cambio de datum (misma referencia geodesica)`;
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'conversion_utm_geo.csv';
+  a.click();
+});
+
+// ========== MÓDULO: Archivos vectoriales (Shapefile / DXF) ==========
+// Estrategia: se reescriben únicamente las coordenadas X,Y dentro del archivo original (mismo tamaño de registro),
+// de modo que atributos (.dbf), capas, bloques y estilos (DXF) se conservan sin alteración.
+// La Z no se modifica; para el cálculo horizontal se usa h = 0 (igual que la operación 2D registrada en EPSG/PROJ).
+const VE_BOX = {latMin:0.4, latMax:16.0, lonMin:-73.8, lonMax:-59.2};
+const PV_MAX_VERTS = 60000, PV_MAX_POINTS = 5000;
+const DATUM_NAME = {canoa:'La Canoa (PSAD56)', regven:'REGVEN (SIRGAS)'};
+const DATUM_TAG  = {canoa:'LaCanoa', regven:'REGVEN'};
+const WKT = {"canoa_geo": "GEOGCS[\"GCS_La_Canoa\",DATUM[\"D_La_Canoa\",SPHEROID[\"International_1924\",6378388.0,297.0]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]]", "regven_geo": "GEOGCS[\"GCS_REGVEN\",DATUM[\"D_REGVEN\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]]", "canoa_18": "PROJCS[\"La_Canoa_UTM_Zone_18N\",GEOGCS[\"GCS_La_Canoa\",DATUM[\"D_La_Canoa\",SPHEROID[\"International_1924\",6378388.0,297.0]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-75.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]", "canoa_19": "PROJCS[\"La_Canoa_UTM_Zone_19N\",GEOGCS[\"GCS_La_Canoa\",DATUM[\"D_La_Canoa\",SPHEROID[\"International_1924\",6378388.0,297.0]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-69.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]", "canoa_20": "PROJCS[\"La_Canoa_UTM_Zone_20N\",GEOGCS[\"GCS_La_Canoa\",DATUM[\"D_La_Canoa\",SPHEROID[\"International_1924\",6378388.0,297.0]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-63.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]", "regven_18": "PROJCS[\"REGVEN_UTM_Zone_18N\",GEOGCS[\"GCS_REGVEN\",DATUM[\"D_REGVEN\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-75.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]", "regven_19": "PROJCS[\"REGVEN_UTM_Zone_19N\",GEOGCS[\"GCS_REGVEN\",DATUM[\"D_REGVEN\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-69.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]", "regven_20": "PROJCS[\"REGVEN_UTM_Zone_20N\",GEOGCS[\"GCS_REGVEN\",DATUM[\"D_REGVEN\",SPHEROID[\"GRS_1980\",6378137.0,298.257222101]],PRIMEM[\"Greenwich\",0.0],UNIT[\"Degree\",0.0174532925199433]],PROJECTION[\"Transverse_Mercator\"],PARAMETER[\"False_Easting\",500000.0],PARAMETER[\"False_Northing\",0.0],PARAMETER[\"Central_Meridian\",-63.0],PARAMETER[\"Scale_Factor\",0.9996],PARAMETER[\"Latitude_Of_Origin\",0.0],UNIT[\"Meter\",1.0]]"};
+const SHP_TYPE_NAME = {0:'Nulo',1:'Punto',3:'Línea',5:'Polígono',8:'Multipunto',11:'Punto Z',13:'Línea Z',15:'Polígono Z',18:'Multipunto Z',21:'Punto M',23:'Línea M',25:'Polígono M',28:'Multipunto M',31:'MultiPatch'};
+
+const V = { model:'mb', dir:'toRegven', fmt:'utm', files:[] };
+const vTick = () => new Promise(r=>setTimeout(r,0));
+const vBase = p => p.split('/').pop();
+const vEsc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const vNum = n => n.toLocaleString('es-VE');
+const vAscii = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\x20-\x7E\n]/g,'?');
+
+seg('segVModel', v=>{ V.model=v; vModelNote(); });
+seg('segVDir', v=>{ V.dir=v; });
+seg('segVFmt', v=>{
+  V.fmt=v;
+  document.getElementById('vZoneWrap').classList.toggle('hide', v!=='utm');
+});
+function vModelNote(){ document.getElementById('vModelNote').textContent = MODEL_INFO[V.model].note; }
+vModelNote();
+
+// ---------- selección de archivos ----------
+const vInput = document.getElementById('vFiles'), vDrop = document.getElementById('vDrop');
+vInput.addEventListener('change', ()=>{ V.files = Array.from(vInput.files); vShowFiles(); });
+['dragenter','dragover'].forEach(ev=>vDrop.addEventListener(ev, e=>{ e.preventDefault(); vDrop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev=>vDrop.addEventListener(ev, e=>{ e.preventDefault(); vDrop.classList.remove('drag'); }));
+vDrop.addEventListener('drop', e=>{ V.files = Array.from(e.dataTransfer.files); vShowFiles(); });
+function vShowFiles(){
+  const el = document.getElementById('vFileList');
+  el.innerHTML = V.files.length
+    ? V.files.map(f=>`${vEsc(f.name)} <span class="sz">(${(f.size/1024).toLocaleString('es-VE',{maximumFractionDigits:1})} KB)</span>`).join('<br>')
+    : '';
+  document.getElementById('vBtnRun').disabled = V.files.length===0;
+}
+
+// ---------- transformador de vértices ----------
+function vMakeTransformer(){
+  const zone = parseInt(document.getElementById('v_zone').value);
+  const {fmt, dir, model} = V;
+  const stats = {total:0, outside:0, invalid:0};
+  const tf = (x, y, silent) => {
+    if(!isFinite(x) || !isFinite(y)){ if(!silent) stats.invalid++; return null; }
+    let o;
+    try{
+      o = fmt==='utm' ? transformPoint({e:x, n:y, h:0}, 'utm', zone, dir, model)
+                      : transformPoint({lat:y, lon:x, h:0}, 'geo', zone, dir, model);
+    }catch(e){ if(!silent) stats.invalid++; return null; }
+    const ok = isFinite(o.lat) && isFinite(o.lon) && (fmt!=='utm' || (isFinite(o.e) && isFinite(o.n)));
+    if(!ok){ if(!silent) stats.invalid++; return null; }
+    if(!silent){
+      stats.total++;
+      if(o.srcLat<VE_BOX.latMin || o.srcLat>VE_BOX.latMax || o.srcLon<VE_BOX.lonMin || o.srcLon>VE_BOX.lonMax) stats.outside++;
+    }
+    // [x salida, y salida, lat destino, lon destino] (lat/lon para la vista previa)
+    return fmt==='utm' ? [o.e, o.n, o.lat, o.lon] : [o.lon, o.lat, o.lat, o.lon];
+  };
+  return {tf, stats, zone, fmt, dir, model};
+}
+function vSrcDatum(){ return V.dir==='toRegven' ? 'canoa' : 'regven'; }
+function vDstDatum(){ return V.dir==='toRegven' ? 'regven' : 'canoa'; }
+
+function vPlausibility(T, rep){
+  const {total, outside} = T.stats;
+  if(total===0){ rep.warnings.push('No se pudo transformar ningún vértice: revisa el tipo de coordenadas declarado.'); return; }
+  if(outside>0){
+    const pct = 100*outside/total;
+    const sys = T.fmt==='utm' ? `UTM huso ${T.zone}N` : 'coordenadas geográficas';
+    const base = `${vNum(outside)} de ${vNum(total)} vértices (${pct.toFixed(2)} %) caen fuera de Venezuela al interpretar el archivo como ${DATUM_NAME[vSrcDatum()]}, ${sys}.`;
+    if(pct>=50) rep.warnings.push(base + ' Es muy probable que el huso, el datum de origen o el tipo de coordenadas declarados no correspondan al archivo (en CAD es común trabajar con coordenadas locales). Revisa antes de usar el resultado.');
+    else if(pct>=1) rep.warnings.push(base + ' Revisa el huso, el datum de origen y que el archivo esté realmente georreferenciado.');
+    else rep.notes.push(base + ' Puede ser normal en límites o islas; si no lo esperabas, revisa los datos.');
+  }
+}
+
+function vCheckPrj(prjBuf, T, rep){
+  const t = new TextDecoder('utf-8').decode(prjBuf).toUpperCase();
+  const projected = /PROJCS/.test(t);
+  const datum = /CANOA|PSAD/.test(t) ? 'canoa' : /REGVEN|SIRGAS/.test(t) ? 'regven' : /WGS/.test(t) ? 'wgs84' : null;
+  const zm = t.match(/ZONE[_ ]*(\d{1,2})/);
+  const src = vSrcDatum();
+  if(datum==='wgs84') rep.warnings.push(`El .prj indica WGS 84; verifica que el archivo realmente esté en ${DATUM_NAME[src]}, como declaraste.`);
+  else if(datum && datum!==src) rep.warnings.push(`El .prj indica ${datum==='canoa'?'La Canoa / PSAD56':'REGVEN / SIRGAS'}, pero declaraste ${DATUM_NAME[src]} como origen. Verifica la dirección de la transformación.`);
+  else if(!datum) rep.notes.push('El .prj no permitió identificar el datum; se usó el sistema declarado.');
+  if(T.fmt==='utm' && !projected) rep.warnings.push('El .prj indica coordenadas geográficas, pero declaraste UTM.');
+  if(T.fmt==='geo' && projected) rep.warnings.push('El .prj indica coordenadas proyectadas, pero declaraste geográficas.');
+  if(T.fmt==='utm' && projected && zm && parseInt(zm[1])!==T.zone) rep.warnings.push(`El .prj indica huso ${zm[1]}, pero declaraste huso ${T.zone}.`);
+}
+
+function vNewPreview(){ return {paths:[], points:[], verts:0, partial:false}; }
+function vPvPath(pv, path){
+  const clean = path.filter(p=>isFinite(p[0]) && isFinite(p[1]));
+  if(clean.length<2) return;
+  if(pv.verts + clean.length > PV_MAX_VERTS){ pv.partial = true; return; }
+  pv.paths.push(clean); pv.verts += clean.length;
+}
+function vPvPoint(pv, p){
+  if(!p || !isFinite(p[0]) || !isFinite(p[1])) return;
+  if(pv.points.length >= PV_MAX_POINTS){ pv.partial = true; return; }
+  pv.points.push(p);
+}
+
+// ---------- recolección de archivos (sueltos o .zip) ----------
+async function vCollect(files){
+  const sets = new Map(), dxfs = [], ignored = [];
+  const add = (path, buf) => {
+    const m = path.toLowerCase().match(/\.([a-z0-9]+)$/);
+    const ext = m ? m[1] : '';
+    const key = ext ? path.slice(0, path.length-ext.length-1) : path;
+    if(ext==='dxf'){ dxfs.push({name:vBase(key), buf}); return; }
+    if(['shp','shx','dbf','prj','cpg'].includes(ext)){
+      const k = key.toLowerCase();
+      if(!sets.has(k)) sets.set(k, {key:vBase(key), files:{}});
+      sets.get(k).files[ext] = buf;
+      return;
+    }
+    ignored.push(vBase(path));
+  };
+  for(const f of files){
+    if(f.name.toLowerCase().endsWith('.zip')){
+      if(typeof JSZip==='undefined') throw new Error('No se pudo cargar la librería para leer .zip (¿sin conexión?). Sube los archivos sueltos (.shp, .shx, .dbf, .prj).');
+      const z = await JSZip.loadAsync(await f.arrayBuffer());
+      for(const e of Object.values(z.files)){
+        if(e.dir || /(^|\/)(__MACOSX\/|\._)/.test(e.name)) continue;
+        add(e.name, await e.async('arraybuffer'));
+      }
+    } else add(f.name, await f.arrayBuffer());
+  }
+  return {sets, dxfs, ignored};
+}
+
+// ---------- SHAPEFILE ----------
+async function vProcessShapefile(set){
+  const T = vMakeTransformer();
+  const rep = {kind:'Shapefile', name:set.key, rows:[], warnings:[], notes:[], table:null};
+  const pv = vNewPreview();
+  const shpBuf = set.files.shp.slice(0);
+  const dv = new DataView(shpBuf);
+  if(shpBuf.byteLength<100 || dv.getInt32(0,false)!==9994) throw new Error(`${set.key}.shp no es un shapefile válido (cabecera incorrecta).`);
+  const declLen = dv.getInt32(24,false)*2;
+  const endOff = Math.min(declLen, shpBuf.byteLength);
+  if(declLen>shpBuf.byteLength) rep.warnings.push('El .shp parece truncado: la longitud declarada excede el tamaño real del archivo.');
+  const hdrType = dv.getInt32(32,true);
+  const approxPts = Math.max(1,(endOff-100)/16);
+  const pathStride = Math.max(1, Math.ceil(approxPts/PV_MAX_VERTS));
+  const ptStride = Math.max(1, Math.ceil(((endOff-100)/28)/PV_MAX_POINTS));
+  let gx0=Infinity, gy0=Infinity, gx1=-Infinity, gy1=-Infinity;
+  const expand = (x,y)=>{ if(x<gx0)gx0=x; if(x>gx1)gx1=x; if(y<gy0)gy0=y; if(y>gy1)gy1=y; };
+  let nRec=0, nNull=0, nUnsup=0, nCorrupt=0;
+  const recIdx = [];   // [offsetPalabras, longitudPalabras] por si hay que reconstruir el .shx
+  const POLY = new Set([3,5,13,15,23,25]), MULTI = new Set([8,18,28]);
+  let off = 100;
+  while(off+12 <= endOff){
+    const cLen = dv.getInt32(off+4,false)*2, cOff = off+8;
+    if(cLen<4 || cOff+cLen>shpBuf.byteLength){ rep.warnings.push(`Registro ${nRec+1} con longitud inválida: se detuvo la lectura (el resto de registros no se transformó).`); break; }
+    const type = dv.getInt32(cOff,true);
+    recIdx.push([off/2, cLen/2]);
+    nRec++;
+    if(type===0){ nNull++; }
+    else if(type===1 || type===11 || type===21){
+      const x = dv.getFloat64(cOff+4,true), y = dv.getFloat64(cOff+12,true);
+      const r = T.tf(x,y);
+      if(r){ dv.setFloat64(cOff+4,r[0],true); dv.setFloat64(cOff+12,r[1],true); expand(r[0],r[1]); if(nRec%ptStride===0) vPvPoint(pv,[r[2],r[3]]); }
+      else expand(x,y);
+    }
+    else if(POLY.has(type) || MULTI.has(type)){
+      const isPoly = POLY.has(type);
+      const nParts = isPoly ? dv.getInt32(cOff+36,true) : 0;
+      const nPts   = dv.getInt32(cOff+(isPoly?40:36),true);
+      const partsOff = cOff+44;
+      const ptsOff = isPoly ? partsOff+4*nParts : cOff+40;
+      if(nPts<0 || nParts<0 || ptsOff+16*nPts > cOff+cLen){ nCorrupt++; }
+      else if(nPts>0){
+        let rx0=Infinity, ry0=Infinity, rx1=-Infinity, ry1=-Infinity;
+        const lats = new Float64Array(nPts), lons = new Float64Array(nPts);
+        for(let i=0;i<nPts;i++){
+          const po = ptsOff+16*i;
+          let X = dv.getFloat64(po,true), Y = dv.getFloat64(po+8,true);
+          const r = T.tf(X,Y);
+          if(r){ dv.setFloat64(po,r[0],true); dv.setFloat64(po+8,r[1],true); X=r[0]; Y=r[1]; lats[i]=r[2]; lons[i]=r[3]; }
+          else { lats[i]=NaN; lons[i]=NaN; }
+          if(X<rx0)rx0=X; if(X>rx1)rx1=X; if(Y<ry0)ry0=Y; if(Y>ry1)ry1=Y;
+        }
+        dv.setFloat64(cOff+4,rx0,true); dv.setFloat64(cOff+12,ry0,true); dv.setFloat64(cOff+20,rx1,true); dv.setFloat64(cOff+28,ry1,true);
+        expand(rx0,ry0); expand(rx1,ry1);
+        if(isPoly){
+          for(let p=0;p<nParts;p++){
+            const s = dv.getInt32(partsOff+4*p,true);
+            const e = p+1<nParts ? dv.getInt32(partsOff+4*(p+1),true) : nPts;
+            const path = [];
+            for(let i=s;i<e;i+=pathStride) path.push([lats[i],lons[i]]);
+            if(e>s && (e-1-s)%pathStride!==0) path.push([lats[e-1],lons[e-1]]);
+            vPvPath(pv,path);
+          }
+        } else if(nRec%ptStride===0){ for(let i=0;i<nPts;i+=pathStride) vPvPoint(pv,[lats[i],lons[i]]); }
+      }
+    }
+    else { nUnsup++; }
+    off = cOff + cLen;
+    if(nRec%1000===0) await vTick();
+  }
+  if(isFinite(gx0)){ dv.setFloat64(36,gx0,true); dv.setFloat64(44,gy0,true); dv.setFloat64(52,gx1,true); dv.setFloat64(60,gy1,true); }
+
+  // .shx: se conserva el original (mismos offsets/longitudes) y se actualiza su caja envolvente; si falta, se reconstruye
+  let shx;
+  if(set.files.shx && set.files.shx.byteLength>=100){
+    shx = set.files.shx.slice(0);
+    new Uint8Array(shx).set(new Uint8Array(shpBuf,36,32),36);
+  } else {
+    shx = new ArrayBuffer(100+8*recIdx.length);
+    new Uint8Array(shx).set(new Uint8Array(shpBuf,0,100),0);
+    const sv = new DataView(shx);
+    sv.setInt32(24,(100+8*recIdx.length)/2,false);
+    recIdx.forEach((r,i)=>{ sv.setInt32(100+8*i,r[0],false); sv.setInt32(104+8*i,r[1],false); });
+    rep.notes.push('El conjunto no traía .shx; se reconstruyó a partir del .shp.');
+  }
+  if(!set.files.dbf) rep.warnings.push('El conjunto no incluye .dbf (atributos).');
+  if(set.files.prj) vCheckPrj(set.files.prj, T, rep);
+  else rep.notes.push('El conjunto no traía .prj; se usó el sistema declarado.');
+
+  rep.rows.push(['Tipo de geometría', SHP_TYPE_NAME[hdrType] || String(hdrType)]);
+  rep.rows.push(['Registros', vNum(nRec)]);
+  rep.rows.push(['Vértices transformados', vNum(T.stats.total)]);
+  if(nNull) rep.rows.push(['Registros nulos (sin geometría)', vNum(nNull)]);
+  if(T.stats.invalid) rep.rows.push(['Vértices no transformados (valor no válido)', vNum(T.stats.invalid)]);
+  if(nUnsup) rep.warnings.push(`${vNum(nUnsup)} registro(s) de un tipo no soportado (p. ej. MultiPatch) NO se transformaron y quedaron en su posición original.`);
+  if(nCorrupt) rep.warnings.push(`${vNum(nCorrupt)} registro(s) con estructura inconsistente NO se transformaron.`);
+  if(T.stats.invalid) rep.warnings.push(`${vNum(T.stats.invalid)} vértice(s) con valores no válidos se dejaron sin cambios.`);
+  if(hdrType>=11 && hdrType<=18 || hdrType===31) rep.notes.push('La coordenada Z no se modificó.');
+  rep.notes.push('Se descartaron índices espaciales y metadatos (.sbn, .sbx, .qix, .xml) porque quedan obsoletos; el programa que abra el archivo puede regenerarlos.');
+  vPlausibility(T, rep);
+
+  const dst = vDstDatum();
+  const name = `${set.key}_${DATUM_TAG[dst]}`;
+  const prj = WKT[V.fmt==='utm' ? `${dst}_${T.zone}` : `${dst}_geo`];
+  const outputs = [
+    {name:name+'.shp', data:shpBuf},
+    {name:name+'.shx', data:shx}
+  ];
+  if(set.files.dbf) outputs.push({name:name+'.dbf', data:set.files.dbf});
+  if(set.files.cpg) outputs.push({name:name+'.cpg', data:set.files.cpg});
+  outputs.push({name:name+'.prj', data:new TextEncoder().encode(prj)});
+  return {kind:'Shapefile', name:set.key, outName:name, rep, outputs, pv};
+}
+
+// ---------- DXF ----------
+function vLatin1Decode(u8){ let s=''; const CH=0x8000; for(let i=0;i<u8.length;i+=CH) s+=String.fromCharCode.apply(null,u8.subarray(i,i+CH)); return s; }
+function vLatin1Encode(s){ const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i)&255; return u; }
+
+// Códigos X de grupo (el Y es X+10) que son PUNTOS en cada entidad. Los vectores (p. ej. 11 de MTEXT o ELLIPSE) no se transforman.
+const DXF_X = {
+  POINT:[10], LINE:[10,11], CIRCLE:[10], ARC:[10], LWPOLYLINE:[10], TEXT:[10,11], ATTRIB:[10,11], ATTDEF:[10,11],
+  MTEXT:[10], INSERT:[10], SPLINE:[10,11], ELLIPSE:[10], SOLID:[10,11,12,13], TRACE:[10,11,12,13], '3DFACE':[10,11,12,13],
+  RAY:[10], XLINE:[10]
+};
+const DXF_PATH = new Set(['LINE','LWPOLYLINE']);
+const DXF_POINT = new Set(['POINT','INSERT','TEXT','MTEXT','ATTRIB','ATTDEF','CIRCLE','ARC','ELLIPSE']);
+
+async function vProcessDxf(item){
+  const T = vMakeTransformer();
+  const rep = {kind:'DXF', name:item.name, rows:[], warnings:[], notes:[], table:null};
+  const pv = vNewPreview();
+  const bytes = new Uint8Array(item.buf);
+  if(vLatin1Decode(bytes.subarray(0,Math.min(22,bytes.length))).startsWith('AutoCAD Binary DXF'))
+    throw new Error(`${item.name}.dxf es un DXF binario. Guárdalo como DXF ASCII (texto) y vuelve a intentarlo.`);
+  const text = vLatin1Decode(bytes);   // latin1 conserva cada byte: lo no modificado queda idéntico, sea cual sea la codificación
+  const eol = text.indexOf('\r\n')>=0 ? '\r\n' : '\n';
+  const lines = text.split(/\r?\n/);
+  const nPairs = Math.floor(lines.length/2);
+  const codes = new Int32Array(nPairs);
+  for(let i=0;i<nPairs;i++){ const c=parseInt(lines[2*i],10); codes[i]=isNaN(c)?-9999:c; }
+  const val = i => lines[2*i+1];
+  const fc = V.fmt==='utm' ? v=>v.toFixed(6) : v=>v.toFixed(10);
+
+  // secciones
+  const sections = [];
+  for(let i=0;i<nPairs;){
+    if(codes[i]===0 && val(i).trim()==='SECTION' && i+1<nPairs && codes[i+1]===2){
+      const name = val(i+1).trim();
+      let j=i+2; while(j<nPairs && !(codes[j]===0 && val(j).trim()==='ENDSEC')) j++;
+      sections.push({name, start:i+2, end:j}); i=j+1;
+    } else i++;
+  }
+  const secEnt = sections.find(s=>s.name==='ENTITIES');
+  if(!secEnt) throw new Error(`${item.name}.dxf no contiene sección ENTITIES (¿archivo vacío o dañado?).`);
+
+  // aplica la transformación a los pares (X,Y) cuyo código X esté en `xs`
+  const applyPairs = (a,b,xs)=>{
+    const out=[];
+    for(let k=a;k<b-1;k++){
+      const c=codes[k];
+      if(xs.includes(c) && codes[k+1]===c+10){
+        const r=T.tf(parseFloat(lines[2*k+1]), parseFloat(lines[2*k+3]));
+        if(r){ lines[2*k+1]=fc(r[0]); lines[2*k+3]=fc(r[1]); out.push([r[2],r[3]]); }
+        k++;
+      }
+    }
+    return out;
+  };
+  // HATCH: se omite el punto de elevación (antes del código 91) y el vector del borde elíptico (11 con tipo de arista 3)
+  const hatchPairs = (a,b)=>{
+    let seen91=false, polyPath=false, edgeType=0; const out=[];
+    for(let k=a;k<b;k++){
+      const c=codes[k];
+      if(c===91){ seen91=true; continue; }
+      if(!seen91) continue;
+      if(c===92){ polyPath=(parseInt(lines[2*k+1],10)&2)!==0; edgeType=0; continue; }
+      if(c===72 && !polyPath){ edgeType=parseInt(lines[2*k+1],10); continue; }
+      if((c===10 || (c===11 && edgeType!==3)) && k+1<b && codes[k+1]===c+10){
+        const r=T.tf(parseFloat(lines[2*k+1]), parseFloat(lines[2*k+3]));
+        if(r){ lines[2*k+1]=fc(r[0]); lines[2*k+3]=fc(r[1]); out.push([r[2],r[3]]); }
+        k++;
+      }
+    }
+    return out;
+  };
+
+  // ENTITIES
+  const cnt = {}, unsupported = {}, paper = {};
+  const bump = (t,n,v)=>{ const o=cnt[t]||(cnt[t]={n:0,v:0}); o.n+=n; o.v+=v; };
+  let poly = null, nEnt = 0;
+  for(let p=secEnt.start; p<secEnt.end; ){
+    if(codes[p]!==0){ p++; continue; }
+    const type = val(p).trim();
+    let q=p+1; while(q<secEnt.end && codes[q]!==0) q++;
+    const a=p+1, b=q;
+    let onPaper=false;
+    for(let k=a;k<b;k++){ if(codes[k]===67 && parseInt(lines[2*k+1],10)===1){ onPaper=true; break; } }
+    if(type==='POLYLINE'){ poly={paper:onPaper, verts:[]}; if(onPaper) paper[type]=(paper[type]||0)+1; else bump(type,1,0); }
+    else if(type==='VERTEX'){
+      if(poly && !poly.paper){
+        let flag=0; for(let k=a;k<b;k++){ if(codes[k]===70){ flag=parseInt(lines[2*k+1],10)||0; break; } }
+        if(!((flag&128) && !(flag&64))){      // se excluyen los registros de cara de una malla poliface (no son puntos)
+          const o=applyPairs(a,b,[10]); bump('POLYLINE',0,o.length); o.forEach(v=>poly.verts.push(v));
+        }
+      }
+    }
+    else if(type==='SEQEND'){ if(poly && !poly.paper) vPvPath(pv, poly.verts); poly=null; }
+    else if(onPaper){ paper[type]=(paper[type]||0)+1; }
+    else if(DXF_X[type]){
+      const o=applyPairs(a,b,DXF_X[type]); bump(type,1,o.length);
+      if(DXF_PATH.has(type)) vPvPath(pv,o); else if(DXF_POINT.has(type) && o.length) vPvPoint(pv,o[0]);
+    }
+    else if(type==='HATCH'){ const o=hatchPairs(a,b); bump(type,1,o.length); }
+    else { unsupported[type]=(unsupported[type]||0)+1; }
+    p=q;
+    if(++nEnt%2000===0) await vTick();
+  }
+
+  // encabezado: extensiones del modelo ($EXTMIN / $EXTMAX)
+  let extUpdated=false;
+  const secHdr = sections.find(s=>s.name==='HEADER');
+  if(secHdr){
+    for(let p=secHdr.start;p<secHdr.end-2;p++){
+      if(codes[p]===9){
+        const nm=val(p).trim();
+        if((nm==='$EXTMIN'||nm==='$EXTMAX') && codes[p+1]===10 && codes[p+2]===20){
+          const x=parseFloat(lines[2*(p+1)+1]), y=parseFloat(lines[2*(p+2)+1]);
+          if(Math.abs(x)<1e9 && Math.abs(y)<1e9){
+            const r=T.tf(x,y,true);
+            if(r){ lines[2*(p+1)+1]=fc(r[0]); lines[2*(p+2)+1]=fc(r[1]); extUpdated=true; }
+          }
+        }
+      }
+    }
+  }
+  // BLOCKS: las definiciones están en coordenadas locales y no se tocan; se avisa si parecen georreferenciadas
+  let blockBig=0;
+  const secBlk = sections.find(s=>s.name==='BLOCKS');
+  if(secBlk && T.fmt==='utm'){
+    for(let k=secBlk.start;k<secBlk.end-1;k++){
+      if(codes[k]===10 && codes[k+1]===20){
+        const x=Math.abs(parseFloat(lines[2*k+1])), y=Math.abs(parseFloat(lines[2*k+3]));
+        if(x>=1e5 && y>=1e5) blockBig++;
+      }
+    }
+  }
+
+  // informe
+  const tIds = Object.keys(cnt);
+  const totEnt = tIds.reduce((s,t)=>s+cnt[t].n,0);
+  rep.rows.push(['Entidades transformadas', vNum(totEnt)]);
+  rep.rows.push(['Vértices/puntos transformados', vNum(T.stats.total)]);
+  if(T.stats.invalid) rep.rows.push(['Vértices no transformados (valor no válido)', vNum(T.stats.invalid)]);
+  rep.table = {head:['Entidad','Cantidad','Puntos transformados'], rows:tIds.sort().map(t=>[t, vNum(cnt[t].n), vNum(cnt[t].v)])};
+  const uTypes = Object.keys(unsupported);
+  if(uTypes.length) rep.warnings.push('Entidades NO transformadas (quedan en su posición original y el dibujo quedará inconsistente): ' + uTypes.sort().map(t=>`${t} ×${vNum(unsupported[t])}`).join(', ') + '. Conviene explotarlas o rehacerlas en el CAD antes de transformar.');
+  const pTypes = Object.keys(paper);
+  if(pTypes.length) rep.notes.push('Entidades del espacio papel (sin cambios, no son coordenadas del terreno): ' + pTypes.sort().map(t=>`${t} ×${vNum(paper[t])}`).join(', ') + '.');
+  if(T.stats.invalid) rep.warnings.push(`${vNum(T.stats.invalid)} vértice(s) con valores no válidos se dejaron sin cambios.`);
+  if(blockBig) rep.warnings.push(`Hay ${vNum(blockBig)} coordenadas de gran magnitud dentro de definiciones de BLOQUE; los bloques se dejaron sin transformar (solo se transforman sus puntos de inserción). Si la geometría georreferenciada está dentro de bloques, el resultado no es válido.`);
+  rep.notes.push('Radios de círculos y arcos, alturas de texto y la coordenada Z no se modifican.');
+  if(extUpdated) rep.notes.push('Se actualizaron $EXTMIN y $EXTMAX; al abrir el archivo conviene ejecutar REGEN / ZOOM EXTENTS.');
+  vPlausibility(T, rep);
+
+  const dst = vDstDatum();
+  const name = `${item.name}_${DATUM_TAG[dst]}`;
+  return {kind:'DXF', name:item.name, outName:name, rep, outputs:[{name:name+'.dxf', data:vLatin1Encode(lines.join(eol))}], pv};
+}
+
+// ---------- informe (texto plano, solo ASCII) ----------
+function vBuildReportText(results){
+  const src=vSrcDatum(), dst=vDstDatum();
+  const L=[];
+  L.push('INFORME DE TRANSFORMACION DE ARCHIVOS VECTORIALES');
+  L.push('Fecha: '+new Date().toISOString());
+  L.push('Sentido: '+DATUM_NAME[src]+' a '+DATUM_NAME[dst]);
+  L.push('Modelo empleado: '+MODEL_INFO[V.model].label+' (parametros oficiales PATVEN_98, IGVSB/LGFS)');
+  L.push('Sistema declarado del archivo de origen: '+(V.fmt==='utm' ? 'UTM huso '+document.getElementById('v_zone').value+'N' : 'Geograficas (grados)'));
+  L.push('Coordenada Z: no modificada. Calculo horizontal con altura igual a cero.');
+  L.push('');
+  results.forEach(r=>{
+    L.push('== '+r.kind+': '+r.name+(r.error?'  [ERROR]':'')+' ==');
+    if(r.error){ L.push('Error: '+r.error); L.push(''); return; }
+    r.rep.rows.forEach(x=>L.push('- '+x[0]+': '+x[1]));
+    if(r.rep.table) r.rep.table.rows.forEach(x=>L.push('    '+x[0]+': '+x[1]+' entidades, '+x[2]+' puntos'));
+    r.rep.warnings.forEach(w=>L.push('ADVERTENCIA: '+w));
+    r.rep.notes.forEach(n=>L.push('Nota: '+n));
+    L.push('Archivos de salida: '+r.outputs.map(o=>o.name).join(', '));
+    L.push('');
+  });
+  L.push('Herramienta de apoyo tecnico. El uso implica aceptar que es bajo exclusiva responsabilidad del usuario.');
+  L.push('Elaborado por Ing. Geodesta Mario Forgione L. - linkedin.com/in/mario-forgione');
+  return vAscii(L.join('\r\n'));
+}
+
+// ---------- descargas ----------
+function vDownload(name, data, mime){
+  const blob = data instanceof Blob ? data : new Blob([data], {type:mime||'application/octet-stream'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+async function vZip(files){
+  const z=new JSZip(); files.forEach(f=>z.file(f.name, f.data));
+  return z.generateAsync({type:'blob', compression:'DEFLATE'});
+}
+
+// ---------- vista previa ----------
+let vMapInst=null, vMapLayer=null;
+function vEnsureMap(){
+  document.getElementById('vMapPlaceholder').classList.add('hide');
+  document.getElementById('vMap').classList.remove('hide');
+  document.getElementById('vMapLegend').style.display='flex';
+  if(!vMapInst){
+    vMapInst = L.map('vMap', {scrollWheelZoom:false}).setView([8.0,-66.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'&copy; OpenStreetMap', maxZoom:18}).addTo(vMapInst);
+  }
+  if(vMapLayer) vMapInst.removeLayer(vMapLayer);
+  vMapLayer = L.layerGroup().addTo(vMapInst);
+  return vMapLayer;
+}
+function vRenderPreview(pv){
+  try{
+    const layer=vEnsureMap(); const b=[];
+    pv.paths.forEach(path=>{ L.polyline(path,{color:'#ED6D15',weight:1.5}).addTo(layer); path.forEach(p=>b.push(p)); });
+    pv.points.forEach(p=>{ L.circleMarker(p,{radius:3,color:'#ED6D15',weight:1,fillColor:'#ED6D15',fillOpacity:.8}).addTo(layer); b.push(p); });
+    if(b.length) vMapInst.fitBounds(L.latLngBounds(b).pad(0.1),{maxZoom:17});
+    document.getElementById('vMapNote').textContent = 'Vista previa simplificada de la geometría ya transformada (' + DATUM_NAME[vDstDatum()] + ').' + (pv.partial ? ' Se muestra solo una parte de los elementos.' : '');
+    setTimeout(()=>vMapInst.invalidateSize(),150);
+  }catch(e){ mapUnavailable('vMapPlaceholder','vMap','vMapLegend'); }
+}
+
+// ---------- ejecución ----------
+function vRenderReport(results){
+  let h='';
+  results.forEach(r=>{
+    h += `<h3>${vEsc(r.kind)}: ${vEsc(r.name)}</h3>`;
+    if(r.error){ h += `<ul class="warnlist"><li>${vEsc(r.error)}</li></ul>`; return; }
+    h += '<table><tbody>' + r.rep.rows.map(x=>`<tr><td>${vEsc(x[0])}</td><td>${vEsc(x[1])}</td></tr>`).join('') + '</tbody></table>';
+    if(r.rep.table) h += '<table><thead><tr>' + r.rep.table.head.map(x=>`<th>${vEsc(x)}</th>`).join('') + '</tr></thead><tbody>' + r.rep.table.rows.map(x=>'<tr>'+x.map(c=>`<td>${vEsc(c)}</td>`).join('')+'</tr>').join('') + '</tbody></table>';
+    if(r.rep.warnings.length) h += '<ul class="warnlist">' + r.rep.warnings.map(w=>`<li>${vEsc(w)}</li>`).join('') + '</ul>';
+    if(r.rep.notes.length) h += '<ul class="notelist">' + r.rep.notes.map(n=>`<li>${vEsc(n)}</li>`).join('') + '</ul>';
+  });
+  document.getElementById('vReport').innerHTML = h;
+}
+
+document.getElementById('vBtnRun').addEventListener('click', async ()=>{
+  const btn=document.getElementById('vBtnRun'), prog=document.getElementById('vProgress');
+  btn.disabled=true;
+  document.getElementById('vResultCard').classList.add('hide');
+  try{
+    prog.textContent='Leyendo archivos…';
+    const {sets, dxfs, ignored} = await vCollect(V.files);
+    const results=[];
+    for(const set of sets.values()){
+      if(!set.files.shp){ results.push({kind:'Shapefile', name:set.key, error:`El conjunto «${set.key}» no incluye el archivo .shp (solo ${Object.keys(set.files).map(e=>'.'+e).join(', ')}).`}); continue; }
+      prog.textContent=`Transformando ${set.key}.shp…`; await vTick();
+      try{ results.push(await vProcessShapefile(set)); }
+      catch(e){ results.push({kind:'Shapefile', name:set.key, error:e.message}); }
+    }
+    for(const d of dxfs){
+      prog.textContent=`Transformando ${d.name}.dxf…`; await vTick();
+      try{ results.push(await vProcessDxf(d)); }
+      catch(e){ results.push({kind:'DXF', name:d.name, error:e.message}); }
+    }
+    if(!results.length) throw new Error('No se encontraron archivos .shp ni .dxf para procesar.');
+    prog.textContent='';
+    vRenderReport(results);
+    const ok = results.filter(r=>!r.error);
+    const reportText = vBuildReportText(results);
+    const dl = document.getElementById('vDownloads'); dl.innerHTML='';
+    const addBtn=(label, fn, ghost)=>{ const b=document.createElement('button'); b.className='btn'+(ghost?' ghost small':''); b.textContent=label; b.addEventListener('click', async()=>{ try{ await fn(); }catch(e){ prog.textContent='No se pudo generar la descarga: '+e.message; } }); dl.appendChild(b); };
+    const reportFile = {name:'informe_transformacion.txt', data:new TextEncoder().encode(reportText)};
+    ok.forEach(r=>{
+      if(r.kind==='DXF') addBtn(`Descargar ${r.outName}.dxf`, ()=>vDownload(r.outName+'.dxf', r.outputs[0].data, 'application/dxf'));
+      else if(typeof JSZip!=='undefined') addBtn(`Descargar ${r.outName}.zip`, async()=>vDownload(r.outName+'.zip', await vZip(r.outputs.concat([reportFile])), 'application/zip'));
+      else r.outputs.forEach(o=>addBtn(`Descargar ${o.name}`, ()=>vDownload(o.name, o.data), true));
+    });
+    if(ok.length>1 && typeof JSZip!=='undefined') addBtn('Descargar todo (.zip)', async()=>{ const all=[]; ok.forEach(r=>r.outputs.forEach(o=>all.push(o))); all.push(reportFile); vDownload('transformacion_archivos.zip', await vZip(all), 'application/zip'); }, true);
+    addBtn('Descargar informe (.txt)', ()=>vDownload(reportFile.name, reportFile.data, 'text/plain'), true);
+    document.getElementById('vResultCard').classList.remove('hide');
+    // vista previa combinada
+    const pv=vNewPreview(); ok.forEach(r=>{ r.pv.paths.forEach(p=>vPvPath(pv,p)); r.pv.points.forEach(p=>vPvPoint(pv,p)); if(r.pv.partial) pv.partial=true; });
+    if(pv.paths.length||pv.points.length) vRenderPreview(pv);
+    if(ignored.length){ const li=document.createElement('p'); li.className='note'; li.textContent='Archivos ignorados (no se procesan): '+ignored.join(', '); document.getElementById('vReport').appendChild(li); }
+  }catch(e){
+    prog.textContent='';
+    document.getElementById('vReport').innerHTML = `<ul class="warnlist"><li>${vEsc(e.message)}</li></ul>`;
+    document.getElementById('vDownloads').innerHTML='';
+    document.getElementById('vResultCard').classList.remove('hide');
+  }finally{ btn.disabled = V.files.length===0; }
+});
+
+// ========== MÓDULO: Conversor GMS ⇄ Grados decimales (solo formato; sin cambio de datum) ==========
+(function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const G = { dir:'toDec', mode:'single', single:null, batch:null };
+
+  function normSym(s){
+    return s.replace(/[′’‘´`]/g,"'").replace(/[″”“]/g,'"').replace(/[º˚°]/g,'°');
+  }
+  // Devuelve {value, warn} o {err}
+  function parseCoord(raw, isLat, allowComma){
+    let s = normSym(String(raw)).replace(/[\u2212\u2013\u2014]/g,'-').trim();
+    if(!s) return {err:'valor vacío'};
+    let neg=false, d, mi=0, se=0, hem=null;
+    const mf = s.match(/^(-?)(\d+)d(\d+)m(\d+(?:\.\d+)?)s([NSEO])$/);   // formato de archivo propio: 9d35m00.386sN
+    if(mf){ neg = mf[1]==='-'; d=+mf[2]; mi=+mf[3]; se=+mf[4]; hem=mf[5]; }
+    else {
+      let mm = s.match(/^([NSEWOnsewo])\s*([\s\S]*\d[\s\S]*)$/);
+      if(mm){ hem=mm[1].toUpperCase(); s=mm[2]; }
+      else { mm = s.match(/^([\s\S]*?)\s*([NSEWOnsewo])$/); if(mm){ hem=mm[2].toUpperCase(); s=mm[1]; } }
+      if(hem==='W') hem='O';
+      s = s.replace(/[°'":]/g,' ').trim();
+      if(s.indexOf(',')>=0){ if(allowComma) s = s.replace(/,/g,'.'); else return {err:'coma no admitida aquí (use punto decimal, o separe columnas con ; )'}; }
+      const t = s.split(/\s+/).filter(Boolean);
+      if(t.length<1 || t.length>3) return {err:'se esperan grados, minutos y segundos'};
+      const re = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
+      for(let i=0;i<t.length;i++){
+        if(!re.test(t[i])) return {err:'no se reconoce "'+t[i]+'"'};
+        if(i>0 && /^[+-]/.test(t[i])) return {err:'el signo solo va en los grados'};
+      }
+      if(t[0][0]==='-') neg=true;
+      d = Math.abs(parseFloat(t[0]));
+      if(t.length>1){
+        if(!/^[+-]?\d+\.?$/.test(t[0])) return {err:'con minutos o segundos, los grados deben ser enteros'};
+        mi = parseFloat(t[1]);
+        if(t.length===3){ if(!/^\d+\.?$/.test(t[1])) return {err:'con segundos, los minutos deben ser enteros'}; se = parseFloat(t[2]); }
+      }
+    }
+    if(mi>=60) return {err:'los minutos deben ser menores de 60'};
+    if(se>=60) return {err:'los segundos deben ser menores de 60'};
+    if(hem){
+      if(isLat && 'NS'.indexOf(hem)<0) return {err:'el hemisferio '+hem+' no corresponde a una latitud'};
+      if(!isLat && 'EO'.indexOf(hem)<0) return {err:'el hemisferio '+hem+' no corresponde a una longitud'};
+      const hneg = (hem==='S'||hem==='O');
+      if(neg) return {err:'signo negativo junto con hemisferio '+hem+' (use solo uno de los dos)'};
+      neg = hneg;
+    }
+    const val = d + mi/60 + se/3600;
+    const lim = isLat ? 90 : 180;
+    if(val > lim + 1e-12) return {err:(isLat?'latitud':'longitud')+' fuera de rango (máx. '+lim+'°)'};
+    let warn = null;
+    if(!isLat && !hem && !neg && val>=55 && val<=75)
+      warn = 'longitud positiva sin hemisferio: se interpretó como Este. En Venezuela la longitud es Oeste (negativa o con O/W).';
+    return {value: neg?-val:val, warn};
+  }
+
+  function opts(){
+    return { dp:+$('gDp').value, sd:+$('gSd').value, comma:$('gSep').value==='comma' };
+  }
+  function fmtDec(v, o){
+    let t = v.toFixed(o.dp); if(parseFloat(t)===0) t = t.replace('-','');
+    return o.comma ? t.replace('.',',') : t;
+  }
+  function fmtDMS(v, isLat, o, file){
+    const abs = Math.abs(v), p = Math.pow(10, o.sd);
+    const units = Math.round(abs*3600*p);
+    const neg = v<0 && units>0;
+    const hem = isLat ? (neg?'S':'N') : (neg?'O':'E');
+    const sInt = units % (60*p), rem = (units - sInt)/(60*p);
+    const m = rem % 60, d = (rem - m)/60;
+    let st = (sInt/p).toFixed(o.sd).padStart(o.sd? 3+o.sd : 2, '0');
+    if(o.comma) st = st.replace('.',',');
+    const mm = String(m).padStart(2,'0');
+    return file ? `${d}d${mm}m${st}s${hem}` : `${d}°${mm}'${st}"${hem}`;
+  }
+
+  function updateUI(){
+    const toDec = G.dir==='toDec';
+    $('gLatLbl').textContent = toDec ? 'Latitud (GMS, ej. 9°35\'00.386"N)' : 'Latitud (grados decimales, N+ / S-)';
+    $('gLonLbl').textContent = toDec ? 'Longitud (GMS, ej. 66°04\'48.090"O)' : 'Longitud (grados decimales, W-)';
+    $('gLat').placeholder = toDec ? '9°35\'00.386"N' : 'ej. 9.583441';
+    $('gLon').placeholder = toDec ? '66°04\'48.090"O' : 'ej. -66.080025';
+    $('gBatchLabel').innerHTML = toDec
+      ? 'Pega las coordenadas — una por línea:<br>id,latitud,longitud (en GMS)'
+      : 'Pega las coordenadas — una por línea:<br>id,latitud,longitud (en grados decimales)';
+    $('gBatchInput').placeholder = toDec
+      ? 'P1,9°35\'00.386"N,66°04\'48.090"O\nP2,9°34\'51.000"N,66°04\'42.600"O'
+      : 'P1,9.583441,-66.080025\nP2,9.580833,-66.078500';
+    $('gNote').textContent = toDec
+      ? 'Formatos aceptados: 9°35\'00.386"N · 9 35 00.386 N · N 9 35 00.386 · -66°04\'48.09" · 66d04m48.09sO (el formato de los archivos de este conversor). Hemisferio con letra (N, S, E, O o W) o con signo, pero no ambos.'
+      : 'Se aceptan grados decimales con punto (o coma, en punto único), con signo (S y O negativos) o con letra de hemisferio.';
+  }
+  function resetOut(){
+    G.single = null; G.batch = null;
+    $('gResult').classList.remove('show'); $('gBatchOut').innerHTML = ''; $('gBtnDownload').style.display='none';
+  }
+
+  seg('segGDir', v=>{ G.dir=v; updateUI(); resetOut(); });
+  seg('segGMode', v=>{
+    G.mode=v;
+    $('gPanelSingle').classList.toggle('hide', v!=='single');
+    $('gPanelBatch').classList.toggle('hide', v!=='batch');
+  });
+  ['gDp','gSd','gSep'].forEach(id=>$(id).addEventListener('change', ()=>{ if(G.single) renderSingle(); if(G.batch) renderBatch(); }));
+
+  function line(label, isLat, v, o, toDec){
+    const dec = fmtDec(v,o)+'°', dms = fmtDMS(v,isLat,o,false);
+    return `<div><span class="k">${label}:</span> <span class="v">${toDec?dec:dms}</span> <span class="k">(${toDec?dms:dec})</span></div>`;
+  }
+  function renderSingle(){
+    const r = G.single, o = opts(), toDec = G.dir==='toDec';
+    let html = '', note = '';
+    if(r.errs.length){ html = r.errs.map(e=>`<div><span class="k">Error:</span> <span class="v">${esc(e)}</span></div>`).join(''); }
+    else {
+      html = line('Latitud', true, r.lat, o, toDec) + line('Longitud', false, r.lon, o, toDec);
+      note = r.warns.join(' ');
+    }
+    $('gResultCoords').innerHTML = html; $('gResultNote').textContent = note;
+    $('gResult').classList.add('show');
+  }
+  $('gBtnCalc').addEventListener('click', ()=>{
+    const a = parseCoord($('gLat').value, true, true), b = parseCoord($('gLon').value, false, true);
+    const errs = [], warns = [];
+    if(a.err) errs.push('Latitud: '+a.err); else if(a.warn) warns.push(a.warn);
+    if(b.err) errs.push('Longitud: '+b.err); else if(b.warn) warns.push(b.warn);
+    G.single = { errs, warns, lat: a.value, lon: b.value };
+    renderSingle();
+  });
+  $('gBtnDemo').addEventListener('click', ()=>{
+    if(G.dir==='toDec'){ $('gLat').value = '9°35\'00.386"N'; $('gLon').value = '66°04\'48.090"O'; }
+    else { $('gLat').value = '9.583440556'; $('gLon').value = '-66.080025'; }
+  });
+
+  function parseBatch(text){
+    const rows = [], errs = [], notes = [];
+    const lines = text.split(/\r?\n/);
+    lines.forEach((raw, i)=>{
+      const ln = raw.trim();
+      if(!ln || ln[0]==='#') return;
+      if(rows.length===0 && errs.length===0 && /lat/i.test(ln) && /lon/i.test(ln)) return;   // encabezado
+      let delim = ',', allowComma = false;
+      if(ln.indexOf('\t')>=0){ delim='\t'; allowComma=true; } else if(ln.indexOf(';')>=0){ delim=';'; allowComma=true; }
+      const f = ln.split(delim).map(x=>x.trim());
+      let id, ls, os;
+      if(f.length===3){ [id, ls, os] = f; }
+      else if(f.length===2){ id = 'L'+(i+1); [ls, os] = f; }
+      else { errs.push(`Línea ${i+1}: se esperan 3 columnas (id, latitud, longitud). Si usa coma decimal, separe las columnas con punto y coma (;).`); return; }
+      const a = parseCoord(ls, true, allowComma), b = parseCoord(os, false, allowComma);
+      if(a.err || b.err){ errs.push(`Línea ${i+1} (${id}): ` + [a.err?'latitud: '+a.err:'', b.err?'longitud: '+b.err:''].filter(Boolean).join(' | ')); return; }
+      const w = [a.warn, b.warn].filter(Boolean);
+      if(w.length) notes.push(`Línea ${i+1} (${id}): ${w[0]}`);
+      rows.push({id, lat:a.value, lon:b.value});
+    });
+    return {rows, errs, notes};
+  }
+  function renderBatch(){
+    const B = G.batch, o = opts(), toDec = G.dir==='toDec';
+    let html = `<p class="note">${B.rows.length} punto(s) convertido(s)` + (B.errs.length ? `, ${B.errs.length} línea(s) con error.` : '.') + '</p>';
+    if(B.rows.length){
+      html += '<div style="overflow-x:auto"><table><thead><tr><th>ID</th><th>Lat. decimal</th><th>Lat. GMS</th><th>Lon. decimal</th><th>Lon. GMS</th></tr></thead><tbody>';
+      B.rows.forEach(r=>{ html += `<tr><td>${esc(r.id)}</td><td>${fmtDec(r.lat,o)}</td><td>${esc(fmtDMS(r.lat,true,o,false))}</td><td>${fmtDec(r.lon,o)}</td><td>${esc(fmtDMS(r.lon,false,o,false))}</td></tr>`; });
+      html += '</tbody></table></div>';
+    }
+    if(B.errs.length) html += '<ul class="warnlist">' + B.errs.slice(0,50).map(e=>`<li>${esc(e)}</li>`).join('') + (B.errs.length>50?`<li>... y ${B.errs.length-50} más</li>`:'') + '</ul>';
+    if(B.notes.length) html += '<ul class="notelist">' + B.notes.slice(0,20).map(e=>`<li>${esc(e)}</li>`).join('') + (B.notes.length>20?`<li>... y ${B.notes.length-20} más</li>`:'') + '</ul>';
+    $('gBatchOut').innerHTML = html;
+    $('gBtnDownload').style.display = B.rows.length ? '' : 'none';
+  }
+  $('gBtnCalcBatch').addEventListener('click', ()=>{
+    G.batch = parseBatch($('gBatchInput').value);
+    if(!G.batch.rows.length && !G.batch.errs.length){ $('gBatchOut').innerHTML = '<p class="note warn">No hay coordenadas para convertir.</p>'; $('gBtnDownload').style.display='none'; G.batch=null; return; }
+    renderBatch();
+  });
+  $('gFile').addEventListener('change', ev=>{
+    const f = ev.target.files[0]; if(!f) return;
+    const rd = new FileReader();
+    rd.onload = ()=>{
+      let t;
+      try { t = new TextDecoder('utf-8', {fatal:true}).decode(rd.result); } catch(e){ t = new TextDecoder('windows-1252').decode(rd.result); }
+      $('gBatchInput').value = t.replace(/^﻿/, '');
+    };
+    rd.readAsArrayBuffer(f); ev.target.value = '';
+  });
+  $('gBtnDownload').addEventListener('click', ()=>{
+    if(!G.batch || !G.batch.rows.length) return;
+    const o = opts(), dl = o.comma ? ';' : ',';
+    const clean = s => String(s).replace(/[;,\r\n\t]/g,' ');
+    let csv = ['id','lat_decimal','lon_decimal','lat_gms','lon_gms'].join(dl) + '\n' +
+      G.batch.rows.map(r=>[clean(r.id), fmtDec(r.lat,o), fmtDec(r.lon,o), fmtDMS(r.lat,true,o,true), fmtDMS(r.lon,false,o,true)].join(dl)).join('\n');
+    if(G.batch.errs.length) csv += `\n\nLineas con error (no convertidas): ${G.batch.errs.length}`;
+    const dirLabel = G.dir==='toDec' ? 'GMS a grados decimales' : 'Grados decimales a GMS';
+    csv += `\n\nSentido de la conversion: ${dirLabel} | Conversion de formato (sin cambio de datum ni de elipsoide) | Hemisferios: N/S/E/O`;
+    csv = csv.normalize('NFD').replace(/[^\x20-\x7E\r\n]/g,'');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'conversion_gms_decimales.csv'; a.click();
+  });
+  updateUI();
+  window.__gmsTest = { parseCoord, fmtDMS, fmtDec, parseBatch };   // solo para pruebas
+})();
+
+</script>
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ventana de Vuelo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: panel de instrumento de una columna — veredicto arriba, franja horaria, flota, descargo y fuentes */
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:18px 28px}
+.wrap{max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+
+header{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px}
+h1{font-family:var(--f-disp); font-weight:800; font-size:28px; letter-spacing:.04em; color:var(--brand); margin:0; line-height:1; text-wrap:balance; text-transform:uppercase}
+h1 .u{color:var(--accent)}
+.sub{color:var(--muted); margin:4px 0 0; font-size:13px}
+.by{font:500 12px var(--f-mono); color:var(--ink); margin-top:6px; letter-spacing:.02em}
+.locline{font:500 12.5px var(--f-mono); color:var(--ink); margin-top:8px}
+.locmeta{font-size:12px; color:var(--muted)}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+.sec{padding:14px 16px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px}
+.sec:first-child{border-top:0}
+.lbl{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.08em; color:var(--brand)}
+.ptitle{font:700 14px var(--f-disp); text-transform:uppercase; letter-spacing:.06em; color:var(--brand); margin:0}
+.ptitle span{font:500 12px var(--f-body); text-transform:none; letter-spacing:0; color:var(--muted)}
+
+.btns{display:flex; flex-wrap:wrap; gap:6px}
+.btn{font:600 13px var(--f-body); padding:8px 12px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn:disabled{opacity:.6; cursor:progress}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+.controls{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px}
+.f{display:flex; flex-direction:column; gap:4px; min-width:0}
+.f label{font-size:12px; color:var(--muted)}
+.f .u{font-family:var(--f-mono); font-size:11px; color:var(--muted)}
+select,input[type=number]{width:100%; font:500 14px var(--f-mono); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px; min-width:0}
+select{font-family:var(--f-body)}
+optgroup{font-style:normal; font-weight:600}
+input[type=range]{width:100%; accent-color:var(--accent)}
+details.man summary{cursor:pointer; font-size:13px; font-weight:600; color:var(--brand); list-style:none}
+details.man summary::before{content:"+ "; font-family:var(--f-mono)}
+details[open].man summary::before{content:"– "}
+.manual{display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end; margin-top:10px}
+@media (max-width:480px){.manual{grid-template-columns:1fr 1fr} .manual .btn{grid-column:1/-1}}
+.status{font-size:12.5px; color:var(--muted)}
+.status.err{color:var(--bad)}
+
+.verdict{display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:center; padding:16px; border-bottom:1px solid var(--line); border-left:5px solid var(--ok); background:var(--okbg); border-radius:8px 8px 0 0}
+.verdict[data-l="1"]{border-left-color:var(--warn); background:var(--warnbg)}
+.verdict[data-l="2"]{border-left-color:var(--bad); background:var(--badbg)}
+.lamp{width:60px; height:60px; border-radius:50%; display:grid; place-items:center; font:800 1.5rem var(--f-disp); color:#FFFFFF; background:var(--ok)}
+[data-l="1"] .lamp{background:var(--warn)} [data-l="2"] .lamp{background:var(--bad)}
+.state{font:800 26px/1 var(--f-disp); letter-spacing:.05em; text-transform:uppercase; color:var(--ok)}
+[data-l="1"] .state{color:var(--warn)} [data-l="2"] .state{color:var(--bad)}
+.verdict p{margin:6px 0 0; font-size:13px; color:var(--muted)}
+
+.res{display:grid; grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:640px){.res{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.m{padding:12px 14px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0}
+.m .k{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+.m .v{font:600 21px var(--f-disp); letter-spacing:.02em; font-variant-numeric:tabular-nums; line-height:1.15; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.m .v small{font:500 12px var(--f-mono); color:var(--muted); margin-left:3px}
+.m .s{font:400 11.5px var(--f-mono); color:var(--muted)}
+.m[data-l="1"] .v{color:var(--warn)} .m[data-l="2"] .v{color:var(--bad)}
+.m[data-l="1"]{background:var(--warnbg)} .m[data-l="2"]{background:var(--badbg)}
+.arrow{display:inline-block; width:18px; height:18px; vertical-align:-2px; margin-left:8px; color:var(--brand)}
+.prof{padding:12px 14px; border-bottom:1px solid var(--line); display:grid; gap:8px; min-width:0}
+.prof svg{width:100%; height:auto; display:block; max-width:560px}
+.w a{color:var(--brand); font-weight:600}
+.mrow{display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px}
+.mrow b{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-right:6px}
+.mrow span{font-family:var(--f-mono)}
+.legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--muted)}
+.legend i{display:inline-block; width:18px; height:0; border-top:2px solid; vertical-align:middle; margin-right:5px}
+
+.warns{display:flex; flex-direction:column; gap:6px; padding:12px 14px}
+.w{font-size:13px; padding:7px 10px; border-radius:5px; border-left:3px solid var(--ok); background:var(--field)}
+.w[data-l="1"]{border-left-color:var(--warn); background:var(--warnbg)}
+.w[data-l="2"]{border-left-color:var(--bad); background:var(--badbg)}
+
+.strip-scroll{overflow-x:auto; padding-bottom:4px}
+.strip{display:grid; grid-auto-flow:column; grid-auto-columns:46px; gap:4px}
+.hour{border:1px solid var(--line); border-radius:6px; background:var(--field); padding:6px 2px; display:grid; gap:4px; justify-items:center; cursor:pointer; color:var(--ink); font:inherit}
+.hour .h{font:500 12px var(--f-mono)}
+.hour .w2{font:400 11px var(--f-mono); color:var(--muted)}
+.hour .bar{width:28px; height:6px; border-radius:3px; background:var(--ok)}
+.hour .bar[data-l="1"]{background:var(--warn)} .hour .bar[data-l="2"]{background:var(--bad)}
+.hour[aria-pressed="true"]{border-color:var(--accent); background:var(--brandsoft)}
+.hour.night{opacity:.65}
+.day-sep{align-self:stretch; display:grid; place-items:center; font:700 10px var(--f-disp); color:var(--brand); writing-mode:vertical-rl; text-transform:uppercase; letter-spacing:.12em}
+.note{font-size:12px; color:var(--muted)}
+
+.table-scroll{overflow-x:auto}
+table{width:100%; border-collapse:collapse; font-size:13px; min-width:540px}
+th{text-align:left; font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.07em; color:var(--muted); padding:6px 8px; border-bottom:1px solid var(--line)}
+td{padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:middle}
+td.num,th.num{text-align:right}
+td.num{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+tr.grp td{font:700 11px var(--f-disp); text-transform:uppercase; letter-spacing:.09em; color:var(--brand); padding-top:14px; border-bottom:none}
+tr.sel td{background:var(--brandsoft)}
+.pill{display:inline-block; padding:2px 9px; border-radius:999px; font:600 10.5px var(--f-body); letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--ok); color:var(--ok)}
+.pill[data-l="1"]{border-color:var(--warn); color:var(--warn)} .pill[data-l="2"]{border-color:var(--bad); color:var(--bad)}
+
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; columns:2 220px; column-gap:24px; font-size:12.5px}
+.srcs li{break-inside:avoid; margin-bottom:5px; color:var(--muted); min-width:0; overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+@media (prefers-reduced-motion:no-preference){.verdict,.hour{transition:background-color .2s,border-color .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Ventana de <span class="u">vuelo</span></h1>
+    <p class="sub">Condiciones meteorológicas frente a los límites técnicos de cada dron DJI</p>
+    <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+    <div class="locline" id="locLine">—</div>
+    <div class="locmeta" id="locMeta">Cargando pronóstico…</div>
+  </div>
+  <div class="btns">
+    <button class="btn pri" id="btnGps" type="button">Usar mi ubicación</button>
+    <button class="btn" id="btnRefresh" type="button">Actualizar</button>
+  </div>
+</header>
+
+<section class="panel" aria-label="Configuración">
+  <div class="sec">
+    <div class="lbl">Equipo y vuelo</div>
+    <div class="controls">
+      <div class="f"><label for="selDrone">Aeronave</label><select id="selDrone"></select></div>
+      <div class="f" id="boxPayload"><label for="selPayload">Carga útil</label>
+        <select id="selPayload"><option value="">Sin sensor adicional</option><option value="L2">Zenmuse L2 (LiDAR)</option></select></div>
+      <div class="f"><label for="selAlt">Altura de vuelo</label><select id="selAlt"></select><span class="u">m AGL</span></div>
+      <div class="f"><label for="rngMargin">Margen de seguridad: <span id="marginVal" class="mono">70 %</span> del límite</label>
+        <input type="range" id="rngMargin" min="50" max="100" step="5" value="70"></div>
+    </div>
+    <details class="man">
+      <summary>Ingresar coordenadas manualmente</summary>
+      <div class="manual">
+        <div class="f"><label for="inLat">Latitud</label><input type="number" id="inLat" step="0.0001" min="-90" max="90" placeholder="10.6427"><span class="u">grados decimales</span></div>
+        <div class="f"><label for="inLon">Longitud</label><input type="number" id="inLon" step="0.0001" min="-180" max="180" placeholder="-71.6125"><span class="u">grados decimales</span></div>
+        <button class="btn" type="button" id="btnManual">Consultar</button>
+      </div>
+    </details>
+    <div class="status" id="status" role="status"></div>
+  </div>
+</section>
+
+<section class="panel" id="mission" aria-label="Misión" hidden>
+  <div class="sec">
+    <div class="lbl">Misión del planificador</div>
+    <div class="mrow" id="missionInfo"></div>
+    <div class="w" id="missionWin" data-l="0"></div>
+  </div>
+</section>
+
+<section class="panel" aria-label="Veredicto">
+  <div class="verdict" id="verdict" data-l="0">
+    <div class="lamp" id="lamp">—</div>
+    <div><div class="state" id="vState">—</div><p id="vSub">—</p></div>
+  </div>
+  <div class="res" id="metrics"></div>
+  <div class="prof">
+    <div class="lbl" id="profLbl">Perfil de viento · 10 a 150 m AGL</div>
+    <div id="profile"></div>
+    <div class="legend">
+      <span><i style="border-color:var(--brand)"></i>Viento sostenido</span>
+      <span><i style="border-color:var(--accent);border-top-style:dashed"></i>Ráfaga estimada</span>
+      <span><i style="border-color:var(--warn);border-top-style:dashed"></i>Margen</span>
+      <span><i style="border-color:var(--bad)"></i>Límite del equipo</span>
+    </div>
+  </div>
+  <div class="warns" id="reasons"></div>
+</section>
+
+<section class="panel" aria-label="Pronóstico por hora">
+  <div class="sec">
+    <h2 class="ptitle">Próximas 36 horas <span id="stripDrone"></span></h2>
+    <div class="strip-scroll"><div class="strip" id="strip"></div></div>
+    <span class="note">Toque una hora para ver el detalle. Las horas atenuadas están fuera del horario diurno.</span>
+  </div>
+</section>
+
+<section class="panel" aria-label="Flota">
+  <div class="sec">
+    <h2 class="ptitle">Toda la flota <span id="fleetHour"></span></h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Modelo</th><th class="num">Límite viento</th><th class="num">Temp. op.</th><th>IP</th><th>Estado</th></tr></thead>
+        <tbody id="fleet"></tbody>
+      </table>
+    </div>
+    <p class="note">Criterio: viento sostenido interpolado a la altura elegida (niveles de 10, 80, 120 y 180 m del modelo) y ráfaga estimada (factor de ráfaga a 10 m aplicado a esa altura) contra el límite DJI × margen; entre paréntesis, el límite de despegue y aterrizaje cuando DJI lo publica aparte. Se evalúan también lluvia frente a la protección IP, temperatura frente al rango operativo, visibilidad para VLOS, tormentas eléctricas, horario diurno e índice Kp (más estricto en equipos RTK).</p>
+  </div>
+</section>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Esta herramienta es de uso referencial, para planificación preliminar y capacitación. El semáforo resulta de comparar un pronóstico numérico con los límites publicados por el fabricante; no mide las condiciones reales en el sitio y no sustituye la verificación en campo, el software de vuelo del fabricante ni el criterio del piloto al mando.</p>
+    <p>Los pronósticos pueden diferir de lo observado, en especial en ráfagas, lluvia convectiva y efectos locales de relieve, edificaciones o costa. El viento a la altura de vuelo se interpola entre los niveles del modelo y la ráfaga a esa altura es una estimación.</p>
+    <p>Las especificaciones técnicas provienen de fichas de fabricantes y distribuidores y pueden cambiar sin previo aviso. Donde las fuentes difieren se adoptó el valor más conservador. El usuario debe verificar los valores antes de usarlos en una operación o propuesta.</p>
+    <p>Esta herramienta no valida el espacio aéreo. Cada operación con aeronaves no tripuladas debe cumplir la normativa aeronáutica vigente en el país donde se realice (DGAC, INAC u otra autoridad competente), incluidos permisos, alturas máximas, operación nocturna y zonas restringidas (consulte DJI FlySafe).</p>
+    <p>El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta o de la información que presenta. Las marcas y nombres de productos mencionados pertenecen a sus respectivos titulares; su inclusión no implica patrocinio ni afiliación.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs" id="srcs"></ul>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+
+</div>
+
+<script>
+/* ---------- Especificaciones DJI ---------- */
+// wind: resistencia máx. (m/s) · takeoff: límite en despegue/aterrizaje si DJI lo publica aparte
+// ip: 0 sin clasificación · 1 IP4x · 2 IP5x · rtk: plataforma con RTK (más sensible a Kp)
+const DRONES = [
+  {g:"Serie Mini", id:"mavicmini", n:"Mavic Mini", wind:8, tmin:0, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini", id:"minise", n:"Mini SE", wind:8.5, tmin:0, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini", id:"mini2", n:"Mini 2", wind:8.5, tmin:0, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini", id:"mini2se", n:"Mini 2 SE", wind:10.7, tmin:0, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini", id:"mini3", n:"Mini 3", wind:10.7, tmin:-10, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini", id:"mini4k", n:"Mini 4K", wind:10.7, tmin:-10, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini Pro", id:"mini3pro", n:"Mini 3 Pro", wind:10.7, tmin:-10, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini Pro", id:"mini4pro", n:"Mini 4 Pro", wind:10.7, tmin:-10, tmax:40, ip:0, ipt:"—"},
+  {g:"Serie Mini Pro", id:"mini5pro", n:"Mini 5 Pro", wind:12, tmin:-10, tmax:40, ip:0, ipt:"—"},
+  {g:"Phantom", id:"p4rtk", n:"Phantom 4 RTK", wind:10, tmin:0, tmax:40, ip:0, ipt:"—", rtk:true},
+  {g:"Enterprise compactos", id:"m3e", n:"Mavic 3E / 3T / 3M", wind:12, tmin:-10, tmax:40, ip:0, ipt:"—", rtk:true},
+  {g:"Enterprise compactos", id:"m4", n:"Matrice 4E / 4T", wind:12, tmin:-10, tmax:40, ip:0, ipt:"—", rtk:true},
+  {g:"Serie Matrice", id:"m30", n:"Matrice 30 / 30T", wind:15, takeoff:12, tmin:-20, tmax:50, ip:2, ipt:"IP55", rtk:true},
+  {g:"Serie Matrice", id:"m300", n:"Matrice 300 RTK", wind:15, takeoff:12, tmin:-20, tmax:50, ip:1, ipt:"IP45", rtk:true, l2:true},
+  {g:"Serie Matrice", id:"m350", n:"Matrice 350 RTK", wind:12, tmin:-20, tmax:50, ip:2, ipt:"IP55", rtk:true, l2:true},
+  {g:"Serie Matrice", id:"m400", n:"Matrice 400", wind:12, takeoff:12, tmin:-20, tmax:50, ip:2, ipt:"IP55", rtk:true, l2:true}
+];
+const PAYLOADS = { L2:{n:"Zenmuse L2", tmin:-20, tmax:50, ip:1, ipt:"IP54"} };
+const ALTS = [10,30,50,70,90,110,130,150];
+const DEFAULT_LOC = {lat:10.6427, lon:-71.6125, label:"Maracaibo (ubicación de ejemplo)"};
+
+const SRC = [
+  ["Meteorología y clima espacial",[
+    ["Open-Meteo – Weather Forecast API","https://open-meteo.com/en/docs"],
+    ["NOAA SWPC – Pronóstico del índice Kp planetario","https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"],
+    ["NOAA SWPC – Escalas de clima espacial","https://www.swpc.noaa.gov/noaa-scales-explanation"]]],
+  ["DJI – Serie Mini",[
+    ["Mavic Mini – Specs","https://www.dji.com/mavic-mini/specs"],
+    ["Mini SE – Soporte y specs","https://www.dji.com/support/product/mini-se"],
+    ["Mini 2 – Specs","https://www.dji.com/mini-2/specs"],
+    ["Mini 2 SE – Specs","https://www.dji.com/mini-2-se/specs"],
+    ["Dr. Drone – Mini 3 technical specifications","https://drdrone.ca/pages/dji-mini-3-technical-specifications-1"],
+    ["Mini 4K – Specs","https://www.dji.com/mini-4k/specs"],
+    ["Mini 3 Pro – Soporte y specs","https://www.dji.com/de/mobile/support/product/mini-3-pro"],
+    ["Mini 4 Pro – Specs","https://www.dji.com/mini-4-pro/specs"],
+    ["Mini 5 Pro – Soporte y specs","https://www.dji.com/se/mobile/support/product/mini-5-pro"]]],
+  ["DJI Enterprise",[
+    ["Phantom 4 RTK – Specs","https://www.dji.com/phantom-4-rtk/info"],
+    ["Mavic 3 Enterprise – Specs","https://enterprise.dji.com/mavic-3-enterprise/specs"],
+    ["Matrice 4 Series – Specs","https://enterprise.dji.com/matrice-4-series/specs"],
+    ["Multitronic – Matrice 4T (EU)","https://multitronic.fi/en/products/4525521/dji-matrice-4t--eu-"],
+    ["Matrice 30 Series – Specs","https://enterprise.dji.com/matrice-30/specs"],
+    ["Ferntech – Matrice 30T","https://www.ferntech.co.nz/dji-matrice-30t-combo"],
+    ["Clifton Cameras – Matrice 300 RTK (PDF)","https://www.cliftoncameras.co.uk/uploads/specifications/DJI%20Matrice%20300%20RTK.pdf"],
+    ["Matrice 350 RTK – Specs","https://enterprise.dji.com/matrice-350-rtk/specs"],
+    ["Clifton Cameras – Matrice 400 (PDF)","https://www.cliftoncameras.co.uk/uploads/specifications/dji-matrice-400-uk-specifications.pdf"],
+    ["Zenmuse L2 – Specs","https://enterprise.dji.com/zenmuse-l2/specs"]]],
+  ["Normativa y espacio aéreo",[
+    ["DJI FlySafe – Zonas geográficas","https://fly-safe.dji.com/"],
+    ["DGAC Ecuador","https://www.aviacioncivil.gob.ec/"],
+    ["INAC Venezuela","http://www.inac.gob.ve/"]]]
+];
+
+/* ---------- Estado ---------- */
+const S = { lat:null, lon:null, label:"", wx:null, kp:null, sel:0, start:0, drone:"m350", payload:"", alt:110, margin:70, mission:null };
+// Equivalencias entre el catálogo del Planificador de Misiones UAV y este catálogo
+const PLAN_MAP = { m400:"m400", m350:"m350", m4e:"m4", m4t:"m4", m30t:"m30", m3e:"m3e", m3m:"m3e", p4r:"p4rtk" };
+const PLAN_PAYLOAD = { l2:"L2" };
+
+function readMission(){
+  let q; try{ q = new URLSearchParams(location.search); }catch(e){ return null; }
+  const lat = parseFloat(q.get("lat")), lon = parseFloat(q.get("lon"));
+  if(isNaN(lat) || isNaN(lon) || Math.abs(lat)>90 || Math.abs(lon)>180) return null;
+  const num = k => { const v = parseFloat(q.get(k)); return isNaN(v) ? null : v; };
+  return { lat, lon, planDrone:q.get("drone")||"", name:(q.get("name")||"").slice(0,80), alt:num("alt"),
+    payload:q.get("payload")||"", field:num("field"), flights:num("flights"), area:num("area"), head:num("head"), mode:q.get("mode")==="lidar"?"LiDAR":"Fotogrametría" };
+}
+
+/* Primera ventana continua de horas aptas que cubre la duración de la misión */
+function findWindow(d){
+  const need = Math.max(1, Math.ceil((S.mission.field || 60)/60));
+  const N = Math.min(36, S.wx.hourly.time.length - S.start);
+  const levels = [];
+  for(let k=0;k<N;k++) levels.push(evaluate(d, hourData(S.start+k)).level);
+  const scan = maxL => { for(let k=0;k+need<=N;k++){ if(levels.slice(k,k+need).every(l=>l<=maxL)) return k; } return -1; };
+  let k = scan(0), lvl = 0;
+  if(k<0){ k = scan(1); lvl = 1; }
+  if(k<0) return {need, none:true};
+  const t0 = S.wx.hourly.time[S.start+k], t1 = S.wx.hourly.time[S.start+k+need-1];
+  return {need, lvl, i:S.start+k, t0, t1};
+}
+const $ = id => document.getElementById(id);
+function store(k,v){ try{ localStorage.setItem("vv_"+k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v = localStorage.getItem("vv_"+k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+
+/* ---------- Utilidades ---------- */
+const LBL = ["Apto","Precaución","No volar"];
+const ICON = ["✓","!","✕"];
+const kmh = v => (v*3.6).toFixed(0);
+const f1 = v => (v==null||isNaN(v)) ? "—" : (Math.round(v*10)/10).toFixed(1);
+function cardinal(d){ return ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"][Math.round(d/22.5)%16]; }
+function setStatus(msg, err){ const el=$("status"); el.textContent=msg||""; el.classList.toggle("err", !!err); }
+
+function effectiveDrone(d){
+  const p = (d.l2 && S.payload) ? PAYLOADS[S.payload] : null;
+  if(!p) return {...d, combo:d.n};
+  return {...d, tmin:Math.max(d.tmin,p.tmin), tmax:Math.min(d.tmax,p.tmax),
+    ip:Math.min(d.ip,p.ip), ipt:(d.ip<=p.ip? d.ipt : p.ipt), combo:d.n+" + "+p.n};
+}
+
+/* ---------- Viento a la altura: interpolación logarítmica entre niveles del modelo ---------- */
+function windAt(i, z){
+  const h = S.wx.hourly;
+  const L = [[10,h.wind_speed_10m],[80,h.wind_speed_80m],[120,h.wind_speed_120m],[180,h.wind_speed_180m]]
+    .filter(l=>l[1] && l[1][i]!=null).map(l=>[l[0], l[1][i]]);
+  if(!L.length) return null;
+  if(z<=L[0][0]) return L[0][1];
+  for(let k=0;k<L.length-1;k++){
+    const [z1,v1]=L[k], [z2,v2]=L[k+1];
+    if(z<=z2){ const t=(Math.log(z)-Math.log(z1))/(Math.log(z2)-Math.log(z1)); return v1+t*(v2-v1); }
+  }
+  return L[L.length-1][1];
+}
+
+function hourData(i){
+  const h = S.wx.hourly, z = S.alt;
+  const w10 = h.wind_speed_10m[i], g10 = h.wind_gusts_10m[i];
+  const wAlt = windAt(i, z) ?? w10;
+  const gf = (w10 && w10>0.5) ? Math.min(Math.max(g10/w10,1),3) : 1.5;
+  const gAlt = z<=10 ? g10 : wAlt*gf;
+  return { time:h.time[i], w10, g10, wAlt, gAlt, dir:h.wind_direction_10m[i],
+    t:h.temperature_2m[i], pp:h.precipitation_probability[i], pr:h.precipitation[i],
+    vis:h.visibility ? h.visibility[i] : null, code:h.weather_code[i], cloud:h.cloud_cover[i],
+    day: h.is_day ? h.is_day[i]===1 : true, kp: kpAt(h.time[i]) };
+}
+
+/* ---------- Evaluación ---------- */
+function evaluate(d0, x){
+  const d = effectiveDrone(d0), m = S.margin/100, R = [];
+  const add = (l,t)=>R.push({l,t});
+  if(x.wAlt > d.wind) add(2, `Viento a ${S.alt} m de ${f1(x.wAlt)} m/s supera el límite de ${d.wind} m/s.`);
+  else if(x.wAlt > d.wind*m) add(1, `Viento a ${S.alt} m de ${f1(x.wAlt)} m/s por encima del ${S.margin} % del límite (${f1(d.wind*m)} m/s).`);
+  else add(0, `Viento a ${S.alt} m: ${f1(x.wAlt)} m/s, dentro del margen (${f1(d.wind*m)} m/s).`);
+  if(x.gAlt > d.wind) add(2, `Ráfagas estimadas de ${f1(x.gAlt)} m/s superan el límite de ${d.wind} m/s.`);
+  else if(x.gAlt > d.wind*m) add(1, `Ráfagas estimadas de ${f1(x.gAlt)} m/s cerca del límite.`);
+  if(d.takeoff){
+    if(x.g10 > d.takeoff) add(2, `Ráfaga a 10 m de ${f1(x.g10)} m/s supera el límite de despegue y aterrizaje (${d.takeoff} m/s).`);
+    else if(x.g10 > d.takeoff*m) add(1, `Ráfaga a 10 m de ${f1(x.g10)} m/s cerca del límite de despegue (${d.takeoff} m/s).`);
+  }
+  if(x.t < d.tmin || x.t > d.tmax) add(2, `Temperatura de ${f1(x.t)} °C fuera del rango operativo (${d.tmin} a ${d.tmax} °C).`);
+  else if(x.t < d.tmin+3 || x.t > d.tmax-3) add(1, `Temperatura de ${f1(x.t)} °C cerca del límite operativo.`);
+  if(x.code >= 95) add(2, "Tormenta eléctrica pronosticada.");
+  const pr = x.pr||0, pp = x.pp||0;
+  if(d.ip===0){
+    if(pr >= 0.1 || pp >= 40) add(2, `Lluvia (${f1(pr)} mm/h, ${pp} % de probabilidad) y el equipo no tiene protección IP.`);
+    else if(pp >= 15) add(1, `Probabilidad de lluvia de ${pp} % y el equipo no tiene protección IP.`);
+  } else {
+    if(pr >= 2.5) add(2, `Lluvia moderada o fuerte (${f1(pr)} mm/h) excede la protección ${d.ipt}.`);
+    else if(pr > 0 || pp >= 40) add(1, `Lluvia ligera posible (${pp} %). ${d.ipt} la tolera, pero afecta sensores y calidad de datos.`);
+  }
+  if(x.vis != null){
+    if(x.vis < 1000) add(2, `Visibilidad de ${(x.vis/1000).toFixed(1)} km impide mantener VLOS.`);
+    else if(x.vis < 3000) add(1, `Visibilidad reducida (${(x.vis/1000).toFixed(1)} km).`);
+  }
+  if(!x.day) add(1, "Fuera del horario diurno: la operación nocturna requiere autorización.");
+  if(x.kp != null){
+    if(d.rtk){
+      if(x.kp >= 5) add(2, `Kp ${f1(x.kp)} (tormenta geomagnética): riesgo alto de perder FIX RTK.`);
+      else if(x.kp >= 4) add(1, `Kp ${f1(x.kp)}: actividad geomagnética, vigile la solución RTK.`);
+    } else if(x.kp >= 6) add(1, `Kp ${f1(x.kp)}: posible degradación del posicionamiento GNSS.`);
+  }
+  const level = Math.max(...R.map(r=>r.l));
+  R.sort((a,b)=>b.l-a.l);
+  return {level, reasons:R, d};
+}
+
+/* ---------- Kp ---------- */
+function kpAt(localTime){
+  if(!S.kp || !S.wx) return null;
+  const tUtc = Date.parse(localTime+":00Z") - S.wx.utc_offset_seconds*1000;
+  let best = null;
+  for(const e of S.kp){ if(e.t <= tUtc) best = e; else break; }
+  return best ? best.kp : null;
+}
+async function fetchKp(){
+  try{
+    const r = await fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json");
+    const j = await r.json();
+    let rows = [];
+    if(Array.isArray(j) && Array.isArray(j[0])) rows = j.slice(1).map(a=>({t:Date.parse(String(a[0]).replace(" ","T")+"Z"), kp:parseFloat(a[1])}));
+    else if(Array.isArray(j)) rows = j.map(o=>{ const s=String(o.time_tag).replace(" ","T"); return {t:Date.parse(s.endsWith("Z")?s:s+"Z"), kp:parseFloat(o.kp)}; });
+    S.kp = rows.filter(r=>!isNaN(r.t)&&!isNaN(r.kp)).sort((a,b)=>a.t-b.t);
+  }catch(e){ S.kp = null; }
+}
+
+/* ---------- Pronóstico ---------- */
+async function fetchWx(){
+  const vars = "temperature_2m,precipitation_probability,precipitation,weather_code,cloud_cover,visibility,wind_speed_10m,wind_speed_80m,wind_speed_120m,wind_speed_180m,wind_direction_10m,wind_gusts_10m,is_day";
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${S.lat}&longitude=${S.lon}&hourly=${vars}&daily=sunrise,sunset&wind_speed_unit=ms&timezone=auto&forecast_days=3`;
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("Open-Meteo respondió "+r.status);
+  return r.json();
+}
+
+async function run(){
+  if(S.lat==null) return;
+  $("btnRefresh").disabled = true;
+  setStatus("Consultando pronóstico e índice Kp…");
+  try{
+    const [wx] = await Promise.all([fetchWx(), fetchKp()]);
+    S.wx = wx;
+    const nowKey = new Date(Date.now()+wx.utc_offset_seconds*1000).toISOString().slice(0,13);
+    const idx = wx.hourly.time.findIndex(t=>t.slice(0,13)===nowKey);
+    S.start = idx<0 ? 0 : idx; S.sel = S.start;
+    $("locLine").textContent = `${S.lat.toFixed(4)}°, ${S.lon.toFixed(4)}° · ${Math.round(wx.elevation)} m s.n.m.`;
+    const sr = wx.daily.sunrise[0].slice(11), ss = wx.daily.sunset[0].slice(11);
+    $("locMeta").textContent = `${S.label} · ${wx.timezone_abbreviation || wx.timezone} · Sol ${sr}–${ss} · actualizado ${new Date().toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"})}`;
+    setStatus([S.missionMsg, S.kp ? "" : "Índice Kp no disponible en este momento; el resto del análisis está completo."].filter(Boolean).join(" "));
+    render();
+  }catch(e){
+    setStatus("No se pudo obtener el pronóstico. Revise la conexión a internet y pulse Actualizar.", true);
+    $("locMeta").textContent = "Sin datos de pronóstico";
+  }finally{ $("btnRefresh").disabled = false; }
+}
+
+/* ---------- Render ---------- */
+function curDrone(){ return DRONES.find(d=>d.id===S.drone) || DRONES[0]; }
+function fmtDay(t){ const d = new Date(t.slice(0,10)+"T12:00:00Z"); return d.toLocaleDateString("es",{weekday:"short", day:"numeric", timeZone:"UTC"}); }
+
+function render(){
+  const d = curDrone();
+  $("boxPayload").hidden = !d.l2;
+  if(!S.wx) return;
+  const x = hourData(S.sel), ev = evaluate(d, x), ed = ev.d, m = S.margin/100;
+  $("verdict").dataset.l = ev.level;
+  $("lamp").textContent = ICON[ev.level];
+  $("vState").textContent = LBL[ev.level];
+  const hh = x.time.slice(11), isNow = S.sel===S.start;
+  $("vSub").textContent = `${ed.combo} · ${isNow ? "ahora ("+hh+")" : fmtDay(x.time)+" "+hh} · ${S.alt} m AGL · margen ${S.margin} %`;
+
+  const lvW = x.wAlt>d.wind?2:x.wAlt>d.wind*m?1:0, lvG = x.gAlt>d.wind?2:x.gAlt>d.wind*m?1:0;
+  const lvT = (x.t<ed.tmin||x.t>ed.tmax)?2:(x.t<ed.tmin+3||x.t>ed.tmax-3)?1:0;
+  const toDir = ((x.dir??0)+180)%360;
+  const arrow = x.dir==null ? "" : `<svg class="arrow" viewBox="0 0 24 24" style="transform:rotate(${toDir}deg)" role="img" aria-label="Viento desde el ${cardinal(x.dir)}"><path d="M12 2 L19 13 H14 V22 H10 V13 H5 Z" style="fill:currentColor"/></svg>`;
+  const cells = [
+    ["Viento a "+S.alt+" m", f1(x.wAlt), "m/s", kmh(x.wAlt)+" km/h · desde "+cardinal(x.dir)+" ("+Math.round(x.dir??0)+"°)", lvW, arrow],
+    ["Ráfaga estimada", f1(x.gAlt), "m/s", "límite "+d.wind+" m/s", lvG],
+    ["Temperatura", f1(x.t), "°C", "rango "+ed.tmin+" a "+ed.tmax+" °C", lvT],
+    ["Lluvia", String(x.pp??0), "%", f1(x.pr||0)+" mm/h · IP "+ed.ipt, 0],
+    ["Visibilidad", x.vis==null?"—":(x.vis/1000).toFixed(1), "km", "nubosidad "+(x.cloud??"—")+" %", x.vis==null?0:x.vis<1000?2:x.vis<3000?1:0],
+    ["Índice Kp", x.kp==null?"—":f1(x.kp), "", x.kp==null?"sin dato":x.kp>=5?"tormenta geomagnética":x.kp>=4?"activo":"tranquilo", x.kp==null?0:(d.rtk?(x.kp>=5?2:x.kp>=4?1:0):(x.kp>=6?1:0))]
+  ];
+  $("metrics").innerHTML = cells.map(c=>`<div class="m" data-l="${c[4]}"><div class="k">${c[0]}</div><div class="v">${c[1]}<small>${c[2]}</small>${c[5]||""}</div><div class="s">${c[3]}</div></div>`).join("");
+  renderProfile(S.sel, d, m);
+  $("reasons").innerHTML = ev.reasons.map(r=>`<div class="w" data-l="${r.l}">${r.t}</div>`).join("");
+
+  const N = Math.min(36, S.wx.hourly.time.length - S.start);
+  let html = "", lastDay = null;
+  for(let k=0;k<N;k++){
+    const i = S.start+k, hx = hourData(i), e = evaluate(d, hx), day = hx.time.slice(0,10);
+    if(lastDay && day!==lastDay) html += `<span class="day-sep">${fmtDay(hx.time)}</span>`;
+    lastDay = day;
+    html += `<button type="button" class="hour${hx.day?"":" night"}" data-i="${i}" aria-pressed="${i===S.sel}" aria-label="${hx.time.slice(11)} ${LBL[e.level]}"><span class="h">${hx.time.slice(11,13)}h</span><span class="bar" data-l="${e.level}"></span><span class="w2">${f1(hx.wAlt)}</span></button>`;
+  }
+  $("strip").innerHTML = html;
+  $("stripDrone").textContent = "· " + ed.combo + " · viento a " + S.alt + " m (m/s)";
+
+  $("fleetHour").textContent = "· " + (isNow?"ahora":fmtDay(x.time)) + " " + hh + " · " + S.alt + " m AGL";
+  let rows = "", g = null;
+  for(const fd of DRONES){
+    if(fd.g!==g){ g = fd.g; rows += `<tr class="grp"><td colspan="5">${g}</td></tr>`; }
+    const e = evaluate(fd, x), dd = e.d;
+    rows += `<tr class="${fd.id===S.drone?"sel":""}"><td>${dd.combo}</td><td class="num">${fd.wind}${fd.takeoff?" ("+fd.takeoff+")":""} m/s</td><td class="num">${dd.tmin} / ${dd.tmax} °C</td><td>${dd.ipt}</td><td><span class="pill" data-l="${e.level}">${LBL[e.level]}</span></td></tr>`;
+  }
+  $("fleet").innerHTML = rows;
+  renderMission(d);
+}
+
+function renderMission(d){
+  const M = S.mission, box = $("mission");
+  box.hidden = !M;
+  if(!M) return;
+  const item = (k,v)=>`<div><b>${k}</b><span>${v}</span></div>`;
+  let info = item("Aeronave", escapeHtml(M.name || M.planDrone)) + item("Modo", M.mode) + item("Altura", Math.round(S.alt)+" m AGL");
+  if(M.area!=null) info += item("Área", M.area.toLocaleString("es",{maximumFractionDigits:1})+" ha");
+  if(M.field!=null) info += item("Tiempo en campo", fmtMin(M.field) + (M.flights? " · "+M.flights+" vuelo"+(M.flights>1?"s":"") : ""));
+  if(M.head!=null) info += item("Rumbo de líneas", Math.round(M.head)+"°");
+  $("missionInfo").innerHTML = info;
+  const w = $("missionWin");
+  if(!S.wx){ w.textContent = "Esperando el pronóstico…"; w.dataset.l = 0; return; }
+  const r = findWindow(d);
+  if(r.none){ w.dataset.l = 2; w.textContent = `No hay una ventana continua de ${r.need} h sin condiciones de "No volar" en las próximas 36 horas para ${effectiveDrone(d).combo}.`; return; }
+  const rng = `${fmtDay(r.t0)} ${r.t0.slice(11)} – ${r.t1.slice(11,13)}:59`;
+  w.dataset.l = r.lvl;
+  w.innerHTML = (r.lvl===0 ? `<strong>Mejor ventana apta:</strong> ` : `<strong>Solo hay ventana con precaución:</strong> `)
+    + `${rng} (${r.need} h continuas requeridas). <a href="#" id="goWin">Ver esa hora</a>`;
+  const g = $("goWin"); if(g) g.onclick = e=>{ e.preventDefault(); S.sel = r.i; render(); };
+}
+function fmtMin(m){ const h=Math.floor(m/60), mm=Math.round(m-h*60); return h ? `${h} h ${String(mm).padStart(2,"0")} min` : `${mm} min`; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ---------- Perfil de viento (SVG) ---------- */
+function renderProfile(i, d, m){
+  const h = S.wx.hourly, w10 = h.wind_speed_10m[i], g10 = h.wind_gusts_10m[i];
+  const gf = (w10 && w10>0.5) ? Math.min(Math.max(g10/w10,1),3) : 1.5;
+  const P = ALTS.map(z=>{ const w = windAt(i,z) ?? w10; return {z, w, g: z<=10 ? g10 : w*gf}; });
+  const W=340, H=210, L=44, R=14, T=10, B=30;
+  const lim = d.wind, mar = d.wind*m;
+  const maxV = Math.max(lim*1.15, ...P.map(p=>p.g||0))*1.05;
+  const step = maxV>24 ? 5 : maxV>12 ? 2 : 1;
+  const xmax = Math.ceil(maxV/step)*step;
+  const X = v => L + (v/xmax)*(W-L-R);
+  const z0 = ALTS[0], z1 = ALTS[ALTS.length-1];
+  const Y = z => H-B - ((z-z0)/(z1-z0))*(H-T-B);
+  $("profLbl").textContent = `Perfil de viento · ${z0} a ${z1} m AGL`;
+  const css = (p,v)=>`style="${p}:var(--${v})"`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Perfil de viento de 10 a 150 m para ${d.n}">`;
+  s += `<rect x="${X(mar)}" y="${T}" width="${X(lim)-X(mar)}" height="${H-T-B}" ${css("fill","warnbg")}/>`;
+  s += `<rect x="${X(lim)}" y="${T}" width="${W-R-X(lim)}" height="${H-T-B}" ${css("fill","badbg")}/>`;
+  for(let v=0; v<=xmax+1e-9; v+=step){
+    s += `<line x1="${X(v)}" x2="${X(v)}" y1="${T}" y2="${H-B}" ${css("stroke","line")} stroke-width="1"/>`;
+    s += `<text x="${X(v)}" y="${H-B+14}" text-anchor="middle" font-size="10" font-family="IBM Plex Mono, monospace" ${css("fill","muted")}>${v}</text>`;
+  }
+  s += `<text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle" font-size="10" font-family="IBM Plex Sans, sans-serif" ${css("fill","muted")}>m/s</text>`;
+  for(const p of P){
+    const sel = p.z===S.alt;
+    if(sel) s += `<rect x="${L}" y="${Y(p.z)-8}" width="${W-L-R}" height="16" ${css("fill","brandsoft")} opacity=".8"/>`;
+    if(!sel && S.mission && Math.abs(p.z-S.alt)<12) continue;
+    s += `<text x="${L-6}" y="${Y(p.z)+3.5}" text-anchor="end" font-size="10" font-family="IBM Plex Mono, monospace" ${css("fill", sel?"accent":"muted")} font-weight="${sel?600:400}">${p.z} m</text>`;
+  }
+  s += `<line x1="${X(mar)}" x2="${X(mar)}" y1="${T}" y2="${H-B}" ${css("stroke","warn")} stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  s += `<line x1="${X(lim)}" x2="${X(lim)}" y1="${T}" y2="${H-B}" ${css("stroke","bad")} stroke-width="1.8"/>`;
+  s += `<polyline fill="none" ${css("stroke","accent")} stroke-width="1.8" stroke-dasharray="5 4" points="${P.map(p=>X(p.g)+","+Y(p.z)).join(" ")}"/>`;
+  s += `<polyline fill="none" ${css("stroke","brand")} stroke-width="2.2" points="${P.map(p=>X(p.w)+","+Y(p.z)).join(" ")}"/>`;
+  for(const p of P){
+    const sel = p.z===S.alt;
+    s += `<circle cx="${X(p.w)}" cy="${Y(p.z)}" r="${sel?4.5:2.6}" style="fill:var(--${sel?"accent":"brand"});stroke:var(--panel)" stroke-width="1.2"/>`;
+  }
+  s += `</svg>`;
+  $("profile").innerHTML = s;
+}
+
+/* ---------- Ubicación ---------- */
+function setLoc(lat, lon, label, noStore){ S.lat=+lat; S.lon=+lon; S.label=label; if(!noStore) store("loc",{lat:S.lat,lon:S.lon,label}); $("inLat").value=S.lat.toFixed(4); $("inLon").value=S.lon.toFixed(4); $("locLine").textContent=`${S.lat.toFixed(4)}°, ${S.lon.toFixed(4)}°`; run(); }
+function useGps(){
+  if(!("geolocation" in navigator)){ setStatus("Este navegador no ofrece ubicación. Ingrese las coordenadas manualmente.", true); return; }
+  $("btnGps").disabled = true; setStatus("Obteniendo posición GPS…");
+  navigator.geolocation.getCurrentPosition(
+    p=>{ $("btnGps").disabled=false; setLoc(p.coords.latitude, p.coords.longitude, `Posición GPS (±${Math.round(p.coords.accuracy)} m)`); },
+    err=>{ $("btnGps").disabled=false;
+      setStatus(err.code===1 ? "Permiso de ubicación denegado. Habilítelo en el navegador o ingrese las coordenadas manualmente."
+        : "No se pudo obtener la posición. Ingrese las coordenadas manualmente.", true); },
+    {enableHighAccuracy:true, timeout:15000, maximumAge:60000});
+}
+
+/* ---------- Inicio ---------- */
+(function init(){
+  let html = "", g = null;
+  for(const d of DRONES){
+    if(d.g!==g){ if(g) html += "</optgroup>"; g=d.g; html += `<optgroup label="${g}">`; }
+    html += `<option value="${d.id}">${d.n}</option>`;
+  }
+  $("selDrone").innerHTML = html + "</optgroup>";
+  S.mission = readMission();
+  if(S.mission && S.mission.alt!=null && S.mission.alt>0){
+    const ma = Math.round(S.mission.alt);
+    if(!ALTS.includes(ma)){ ALTS.push(ma); ALTS.sort((a,b)=>a-b); }
+  }
+  $("selAlt").innerHTML = ALTS.map(a=>`<option value="${a}">${a} m${S.mission && a===Math.round(S.mission.alt||-1) ? " · misión" : ""}</option>`).join("");
+  $("srcs").innerHTML = SRC.map(gr=>`<li class="grp">${gr[0]}</li>`+gr[1].map(x=>`<li><a href="${x[1]}" target="_blank" rel="noopener">${x[0]}</a></li>`).join("")).join("");
+
+  const cfg = load("cfg");
+  if(cfg){ Object.assign(S, {drone:cfg.drone||S.drone, payload:cfg.payload||"", margin:cfg.margin||70}); if(ALTS.includes(cfg.alt)) S.alt = cfg.alt; }
+  let missionMsg = "";
+  if(S.mission){
+    const M = S.mission, mapped = PLAN_MAP[M.planDrone];
+    if(mapped){ S.drone = mapped; S.payload = PLAN_PAYLOAD[M.payload] || ""; }
+    else missionMsg = `La aeronave de la misión (${M.name || M.planDrone}) no está en este catálogo meteorológico. Seleccione un equipo con límites equivalentes.`;
+    if(M.payload && !PLAN_PAYLOAD[M.payload]) missionMsg = (missionMsg ? missionMsg+" " : "") + "El sensor de la misión no tiene límites ambientales en este catálogo; se evalúa solo la aeronave.";
+    if(M.alt!=null && M.alt>0) S.alt = Math.round(M.alt);
+  }
+  $("selDrone").value = S.drone; $("selPayload").value = S.payload; $("selAlt").value = String(S.alt);
+  $("rngMargin").value = S.margin; $("marginVal").textContent = S.margin+" %";
+  const saveCfg = ()=>store("cfg",{drone:S.drone,payload:S.payload,alt:S.alt,margin:S.margin});
+  $("selDrone").addEventListener("change", e=>{ S.drone=e.target.value; saveCfg(); render(); });
+  $("selPayload").addEventListener("change", e=>{ S.payload=e.target.value; saveCfg(); render(); });
+  $("selAlt").addEventListener("change", e=>{ S.alt=+e.target.value; saveCfg(); render(); });
+  $("rngMargin").addEventListener("input", e=>{ S.margin=+e.target.value; $("marginVal").textContent=S.margin+" %"; saveCfg(); render(); });
+  $("strip").addEventListener("click", e=>{ const b=e.target.closest(".hour"); if(!b) return; S.sel=+b.dataset.i; render(); });
+  $("btnGps").addEventListener("click", useGps);
+  $("btnRefresh").addEventListener("click", run);
+  $("btnManual").addEventListener("click", ()=>{
+    const la=parseFloat($("inLat").value), lo=parseFloat($("inLon").value);
+    if(isNaN(la)||isNaN(lo)||Math.abs(la)>90||Math.abs(lo)>180){ setStatus("Coordenadas no válidas. Use grados decimales, por ejemplo 10.6427 y -71.6125.", true); return; }
+    setLoc(la, lo, "Coordenadas manuales");
+  });
+  render();
+  const saved = load("loc");
+  if(S.mission){ S.missionMsg = missionMsg; setLoc(S.mission.lat, S.mission.lon, "Centroide del área de la misión", true); }
+  else if(saved && saved.lat!=null) setLoc(saved.lat, saved.lon, saved.label);
+  else setLoc(DEFAULT_LOC.lat, DEFAULT_LOC.lon, DEFAULT_LOC.label);
+})();
+</script>
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

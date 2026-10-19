@@ -1,0 +1,1557 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Navegador de Campo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* required styles */
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+/* Prevents IE11 from highlighting tiles in blue */
+.leaflet-tile::selection {
+	background: transparent;
+}
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+/* hack that prevents hw layers "stretching" when loading new tiles */
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.leaflet-container img.leaflet-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+}
+
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	/* Fallback for FF which doesn't support pinch-zoom */
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+
+.leaflet-pane         { z-index: 400; }
+
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: url(#default#VML);
+	display: inline-block;
+	position: absolute;
+	}
+
+
+/* control positioning */
+
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+
+
+/* zoom and fade animations */
+
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+
+
+/* cursors */
+
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+
+/* marker & overlays interactivity */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+
+/* general typography */
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+
+/* general toolbar styles */
+
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+
+
+/* layers control */
+
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: none;
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: none;
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+.leaflet-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: none;
+	}
+
+
+/* attribution and scale controls */
+
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+
+/* popup */
+
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+
+
+/* div icon */
+
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+
+/* Tooltip */
+/* Base styles for the element that has a tooltip */
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+
+
+</style>
+<style>
+/* Layout: mapa protagonista; barra de herramientas arriba, tablero de navegación debajo, capas y puntos al final */
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9; --grid:#DBE3EC;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; --grid:#1C3047; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; --grid:#1C3047; color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:16px 28px}
+.wrap{max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:14px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+
+header{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:10px}
+h1{font-family:var(--f-disp); font-weight:800; font-size:26px; letter-spacing:.04em; color:var(--brand); margin:0; line-height:1; text-wrap:balance; text-transform:uppercase}
+h1 .u{color:var(--accent)}
+.sub{color:var(--muted); margin:4px 0 0; font-size:13px}
+.by{font:500 12px var(--f-mono); color:var(--ink); margin-top:6px; letter-spacing:.02em}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+.lbl{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.08em; color:var(--brand)}
+.ptitle{font:700 13px var(--f-disp); text-transform:uppercase; letter-spacing:.06em; color:var(--brand); margin:0}
+
+.tools{display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 12px; border-bottom:1px solid var(--line)}
+.tools .sp{flex:1 1 auto}
+.btn{font:600 13px var(--f-body); padding:8px 12px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.sm{padding:5px 9px; font-size:12px}
+.btn svg{width:16px; height:16px}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--panel)}
+.seg button{border:0; background:transparent; color:var(--muted); font:600 13px var(--f-body); padding:7px 11px; cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--brand); color:var(--brand-ink)}
+.chk{display:inline-flex; align-items:center; gap:6px; font-size:13px; cursor:pointer}
+input:focus-visible,select:focus-visible,button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+input[type=text]{width:100%; font:500 14px var(--f-body); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px; min-width:0}
+
+#map{height:min(66vh,640px); min-height:360px; width:100%; background:var(--field); z-index:0}
+.leaflet-container{font-family:var(--f-body)}
+.leaflet-control-scale-line{background:var(--panel); color:var(--ink); border-color:var(--ink); font-family:var(--f-mono)}
+.leaflet-bar a{background:var(--panel); color:var(--ink); border-bottom-color:var(--line)}
+.leaflet-control-attribution{background:rgba(255,255,255,.78); color:#333; font-size:10px}
+.leaflet-tooltip{font:500 12px var(--f-body)}
+.status{font-size:12.5px; color:var(--muted); padding:8px 12px; border-top:1px solid var(--line)}
+.status:empty{display:none}
+.status.err{color:var(--bad)}
+
+/* marcadores */
+.me{position:relative; width:22px; height:22px}
+.me .dot{position:absolute; inset:4px; border-radius:50%; background:#1E88E5; border:2.5px solid #FFFFFF; box-shadow:0 0 0 2px rgba(30,136,229,.35)}
+.me .cone{position:absolute; left:50%; top:50%; width:0; height:0; transform-origin:0 0}
+.me .cone::before{content:""; position:absolute; left:-7px; top:-26px; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:16px solid #1E88E5; opacity:.85}
+.tgt{width:22px; height:22px; border:3px solid #ED6D15; border-radius:50%; background:rgba(237,109,21,.15); box-shadow:0 0 0 2px #FFFFFF}
+.mk{width:14px; height:14px; background:#ED6D15; border:2px solid #FFFFFF; transform:rotate(45deg); box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+
+/* tablero */
+.dash{display:grid; grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){.dash{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.m{padding:11px 13px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0; display:flex; flex-direction:column; gap:2px}
+.m .k{font:600 11px var(--f-body); text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+.m .v{font:600 19px var(--f-disp); letter-spacing:.02em; font-variant-numeric:tabular-nums; line-height:1.2; overflow-wrap:anywhere}
+.m .v small{font:500 12px var(--f-mono); color:var(--muted); margin-left:3px}
+.m .s{font:400 12px var(--f-mono); color:var(--muted); overflow-wrap:anywhere}
+.m .act{margin-top:6px; display:flex; gap:6px; flex-wrap:wrap}
+.m[data-l="ok"]{background:var(--okbg)} .m[data-l="ok"] .v{color:var(--ok)}
+.m[data-l="warn"]{background:var(--warnbg)} .m[data-l="warn"] .v{color:var(--warn)}
+.copy{cursor:pointer; border-bottom:1px dotted var(--muted)}
+
+/* capas y puntos */
+.cols{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px}
+@media (max-width:820px){.cols{grid-template-columns:minmax(0,1fr)}}
+.sec{padding:14px 16px; display:flex; flex-direction:column; gap:10px}
+.list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.list li{display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--field)}
+.sw{width:16px; height:16px; border-radius:3px; border:2px solid #FFFFFF; box-shadow:0 0 0 1px var(--line); cursor:pointer; padding:0}
+.list .nm{font-weight:600; overflow-wrap:anywhere}
+.list .meta{font:400 11.5px var(--f-mono); color:var(--muted)}
+.list .bt{display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end}
+.empty{font-size:12.5px; color:var(--muted); padding:10px; border:1px dashed var(--line); border-radius:6px}
+.form{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.form .full{grid-column:1/-1}
+.form .f{display:flex; flex-direction:column; gap:4px}
+.form label{font-size:12px; color:var(--muted)}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.note{font-size:12px; color:var(--muted)}
+textarea{width:100%; height:130px; font:400 11.5px var(--f-mono); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:8px}
+
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; columns:2 220px; column-gap:24px; font-size:12.5px}
+.srcs li{break-inside:avoid; margin-bottom:5px; color:var(--muted); overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+/* mapas PDF */
+.pdfpane-note{font-size:12px; color:var(--muted)}
+.pdfctl{display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center}
+.pdfctl .rng{display:inline-flex; align-items:center; gap:8px; font-size:13px}
+.pdfctl input[type=range]{width:150px; accent-color:var(--accent)}
+.pdfctl output{font:500 12px var(--f-mono); color:var(--muted); min-width:3.5em}
+.list li.off .nm{color:var(--muted)}
+.thumb{width:44px; height:34px; border-radius:3px; border:1px solid var(--line); object-fit:cover; background:var(--panel)}
+.btn.warnb{background:var(--bad); border-color:var(--bad); color:#FFFFFF}
+.leaflet-control.pdfbtn a{width:auto!important; min-width:34px; padding:0 8px; font:700 11px/30px var(--f-body); letter-spacing:.06em; text-decoration:none; text-align:center}
+.leaflet-control.pdfbtn a.on{background:var(--accent)!important; color:var(--accent-ink)!important}
+@media (max-width:560px){#pdfList li{grid-template-columns:auto minmax(0,1fr)} #pdfList .bt{grid-column:1/-1; justify-content:flex-start}}
+.pdfout{background:rgba(20,84,135,.93); color:#FFFFFF; font:600 12.5px var(--f-body); padding:7px 11px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,.3); max-width:min(78vw,420px); cursor:pointer; line-height:1.35}
+.pdfout b{color:#FFC08F; font-weight:700}
+.pdfout[hidden]{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none!important; animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Navegador de <span class="u">campo</span></h1>
+    <p class="sub">KML / KMZ y mapas PDF georreferenciados sobre imagen satelital u OpenStreetMap, con su posición GPS en tiempo real</p>
+    <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+  </div>
+</header>
+
+<section class="panel" aria-label="Mapa">
+  <div class="tools">
+    <button class="btn pri" id="btnLoad" type="button">Cargar KML / KMZ</button>
+    <input type="file" id="file" accept=".kml,.kmz" multiple hidden>
+    <button class="btn pri" id="btnPdf" type="button">Cargar mapa PDF</button>
+    <input type="file" id="pdfFile" accept=".pdf,application/pdf" multiple hidden>
+    <button class="btn" id="btnGps" type="button" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" style="fill:currentColor"/><circle cx="12" cy="12" r="8" style="fill:none;stroke:currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3" style="stroke:currentColor" stroke-width="2"/></svg>
+      <span id="gpsTxt">Activar GPS</span></button>
+    <button class="btn" id="btnFollow" type="button" aria-pressed="false" hidden>Seguir mi posición</button>
+    <span class="sp"></span>
+    <div class="seg" role="group" aria-label="Mapa de fondo">
+      <button id="bSat" type="button" aria-pressed="true">Satélite</button><button id="bOsm" type="button" aria-pressed="false">OSM</button>
+    </div>
+    <label class="chk" id="roadsBox"><input type="checkbox" id="chkRoads" checked> Vías</label>
+  </div>
+  <div id="map" role="application" aria-label="Mapa de campo"></div>
+  <div class="status" id="status" role="status"></div>
+</section>
+
+<section class="panel" aria-label="Tablero de navegación">
+  <div class="dash">
+    <div class="m" id="mPos"><div class="k">Mi posición</div><div class="v" id="vPos">—</div><div class="s" id="sPos">Active el GPS para ver su ubicación</div></div>
+    <div class="m" id="mUtm"><div class="k">UTM · REGVEN / SIRGAS</div><div class="v" id="vUtm">—</div><div class="s" id="sUtm">—</div></div>
+    <div class="m" id="mArea"><div class="k">Área de trabajo</div><div class="v" id="vArea">—</div><div class="s" id="sArea">Cargue un KML con polígonos</div></div>
+    <div class="m" id="mEdge"><div class="k">Borde más cercano</div><div class="v" id="vEdge">—</div><div class="s" id="sEdge">—</div><div class="act"><button class="btn sm" id="btnEdge" type="button" hidden>Ir al borde</button></div></div>
+    <div class="m" id="mTgt"><div class="k">Objetivo</div><div class="v" id="vTgt">—</div><div class="s" id="sTgt">Toque el mapa para fijar un objetivo</div><div class="act"><button class="btn sm" id="btnClrTgt" type="button" hidden>Quitar objetivo</button></div></div>
+    <div class="m" id="mMove"><div class="k">Marcha</div><div class="v" id="vMove">—</div><div class="s" id="sMove">Rumbo y velocidad con el equipo en movimiento</div></div>
+    <div class="m" id="mTrack"><div class="k">Recorrido</div><div class="v" id="vTrack">—</div><div class="s" id="sTrack">Sin grabar</div><div class="act"><button class="btn sm" id="btnRec" type="button">Grabar recorrido</button><button class="btn sm" id="btnClrTrack" type="button" hidden>Borrar</button></div></div>
+    <div class="m" id="mPts"><div class="k">Puntos marcados</div><div class="v" id="vPts">0</div><div class="s">Accesos, portones, obstáculos</div><div class="act"><button class="btn sm on" id="btnMark" type="button">Marcar punto</button></div></div>
+  </div>
+</section>
+
+<section class="panel" id="markPanel" aria-label="Marcar punto" hidden>
+  <div class="sec">
+    <h2 class="ptitle">Marcar punto</h2>
+    <div class="form">
+      <div class="f"><label for="inName">Nombre</label><input type="text" id="inName" maxlength="60" placeholder="Acceso norte"></div>
+      <div class="f"><label for="inNote">Nota</label><input type="text" id="inNote" maxlength="160" placeholder="Portón con candado, pedir llave"></div>
+      <div class="row full">
+        <button class="btn pri" id="btnSaveGps" type="button">Guardar en mi posición</button>
+        <button class="btn" id="btnSaveTgt" type="button">Guardar en el objetivo</button>
+        <button class="btn" id="btnCancelMark" type="button">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="pdfPanel" aria-label="Mis mapas PDF">
+  <div class="sec">
+    <h2 class="ptitle">Mis mapas PDF</h2>
+    <p class="pdfpane-note">Compatible con mapas creados en el <a class="li" href="generador-mapas-base.html">Generador de Mapas Base</a>. Se guardan en este dispositivo y quedan disponibles sin conexión.</p>
+    <div class="pdfctl">
+      <label class="rng" for="pdfOp">Transparencia <input type="range" id="pdfOp" min="0" max="100" step="5" value="0"> <output id="pdfOpV" for="pdfOp">0 %</output></label>
+      <label class="chk"><input type="checkbox" id="pdfOnly"> Solo PDF (sin fondo en línea)</label>
+    </div>
+    <ul class="list" id="pdfList"></ul>
+    <p class="note" id="pdfStore"></p>
+  </div>
+</section>
+
+<div class="cols">
+  <section class="panel" aria-label="Capas">
+    <div class="sec">
+      <h2 class="ptitle">Capas cargadas</h2>
+      <ul class="list" id="layers"></ul>
+      <p class="note">Toque el cuadro de color para cambiarlo. Las capas se cargan en este dispositivo y no se envían a ningún servidor.</p>
+    </div>
+  </section>
+  <section class="panel" aria-label="Puntos y exportación">
+    <div class="sec">
+      <h2 class="ptitle">Puntos marcados y exportación</h2>
+      <ul class="list" id="points"></ul>
+      <div class="row">
+        <button class="btn pri" id="btnExport" type="button">Exportar puntos y recorrido (KML)</button>
+      </div>
+      <div class="note" id="expNote"></div>
+      <div id="expBox" hidden><textarea id="expText" readonly aria-label="KML exportado"></textarea></div>
+    </div>
+  </section>
+</div>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Esta herramienta es de uso referencial, para orientación en campo, reconocimiento de accesos y capacitación. No es un instrumento de medición: la posición proviene del GNSS del teléfono, con precisiones típicas de 3 a 10 m que empeoran bajo vegetación, entre edificaciones o con poca visibilidad del cielo. No debe usarse para replanteo, deslinde ni para definir linderos legales.</p>
+    <p>La imagen satelital y la cartografía de fondo pueden estar desactualizadas o presentar desplazamientos respecto a REGVEN/SIRGAS. Las coordenadas UTM se calculan sobre el elipsoide WGS84, equivalente en la práctica a REGVEN/SIRGAS para fines de navegación; no corresponden a PSAD56 (La Canoa). Los KML/KMZ y los mapas PDF son responsabilidad de quien los carga.</p>
+    <p>Mapas PDF: se admiten los PDF georreferenciados creados con el Generador de Mapas Base. La primera carga de un mapa requiere conexión a internet para descargar el lector de PDF; después el mapa queda guardado en el navegador de este dispositivo y se puede ver sin conexión, siempre que esta página esté abierta o en la caché del navegador. La coincidencia entre su posición y el PDF depende de la precisión del GPS del teléfono y de la georreferenciación de la imagen de fondo usada al crear el mapa. El navegador puede borrar los datos guardados si el equipo se queda sin espacio o si se limpian los datos del sitio: conserve los PDF originales.</p>
+    <p>Privacidad: su posición, sus capas, sus mapas PDF y sus puntos se procesan solo en este dispositivo y no se envían a ningún servidor. Los proveedores del mapa de fondo reciben las solicitudes de las teselas de la zona que usted visualiza. El mapa de fondo requiere conexión a internet.</p>
+    <p>Respete la propiedad privada y obtenga los permisos de acceso correspondientes. El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta o de la información que presenta. Las marcas y nombres de productos mencionados pertenecen a sus respectivos titulares; su inclusión no implica patrocinio ni afiliación.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs" id="srcs"></ul>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function(){
+const $ = id => document.getElementById(id);
+const K = Math.PI/180, RE = 6371008.8;
+const COLORS = ["#ED6D15","#00BCD4","#FFD600","#E91E63","#76FF03","#FFFFFF","#7C4DFF"];
+
+const SRC = [
+  ["Cartografía y librerías",[
+    ["Esri – World Imagery","https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9"],
+    ["Esri – World Transportation (referencia de vías)","https://www.arcgis.com/home/item.html?id=94f838a535334cf1aa061846514b77c7"],
+    ["© OpenStreetMap contributors","https://www.openstreetmap.org/copyright"],
+    ["Leaflet","https://leafletjs.com"],
+    ["JSZip","https://stuk.github.io/jszip/"],
+    ["Mozilla – PDF.js","https://mozilla.github.io/pdf.js/"],
+    ["pdf-lib","https://pdf-lib.js.org/"]]],
+  ["Normas y métodos",[
+    ["OGC – KML 2.2 Standard","https://www.ogc.org/standard/kml/"],
+    ["ISO 32000-2 – PDF 2.0, funciones geoespaciales (Viewport y Measure GEO)","https://www.iso.org/standard/75839.html"],
+    ["W3C – Indexed Database API","https://www.w3.org/TR/IndexedDB/"],
+    ["WHATWG – Storage Standard (almacenamiento persistente)","https://storage.spec.whatwg.org/"],
+    ["USGS – Snyder, Map Projections: A Working Manual (UTM)","https://pubs.usgs.gov/publication/pp1395"],
+    ["W3C – Geolocation API","https://www.w3.org/TR/geolocation/"],
+    ["W3C – Screen Wake Lock API","https://www.w3.org/TR/screen-wake-lock/"],
+    ["SIRGAS – Sistema de Referencia Geocéntrico para las Américas","https://sirgas.ipgh.org/"]]]
+];
+$("srcs").innerHTML = SRC.map(g=>`<li class="grp">${g[0]}</li>`+g[1].map(x=>`<li><a href="${x[1]}" target="_blank" rel="noopener">${x[0]}</a></li>`).join("")).join("");
+
+/* ---------- Utilidades geodésicas ---------- */
+function dist(a,b){ const dφ=(b[0]-a[0])*K, dλ=(b[1]-a[1])*K, s=Math.sin(dφ/2)**2+Math.cos(a[0]*K)*Math.cos(b[0]*K)*Math.sin(dλ/2)**2; return 2*RE*Math.asin(Math.min(1,Math.sqrt(s))); }
+function bearing(a,b){ const φ1=a[0]*K, φ2=b[0]*K, dλ=(b[1]-a[1])*K; const y=Math.sin(dλ)*Math.cos(φ2), x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(dλ); return (Math.atan2(y,x)/K+360)%360; }
+const CARD = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+const card = d => CARD[Math.round(d/22.5)%16];
+const fmtD = m => m<1000 ? `${Math.round(m)}<small>m</small>` : `${(m/1000).toFixed(m<10000?2:1)}<small>km</small>`;
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* WGS84 → UTM (Snyder, USGS PP 1395) */
+function toUTM(lat, lon){
+  const a=6378137, f=1/298.257223563, k0=0.9996, e2=f*(2-f), ep2=e2/(1-e2);
+  let zone = Math.floor((lon+180)/6)+1; if(zone>60) zone=60;
+  const lon0 = ((zone-1)*6-180+3)*K, φ=lat*K, λ=lon*K;
+  const N=a/Math.sqrt(1-e2*Math.sin(φ)**2), T=Math.tan(φ)**2, C=ep2*Math.cos(φ)**2, A=Math.cos(φ)*(λ-lon0);
+  const e4=e2*e2, e6=e4*e2;
+  const M=a*((1-e2/4-3*e4/64-5*e6/256)*φ-(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*φ)+(15*e4/256+45*e6/1024)*Math.sin(4*φ)-(35*e6/3072)*Math.sin(6*φ));
+  const E=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T*T+72*C-58*ep2)*A**5/120)+500000;
+  let Nn=k0*(M+N*Math.tan(φ)*(A*A/2+(5-T+9*C+4*C*C)*A**4/24+(61-58*T+T*T+600*C-330*ep2)*A**6/720));
+  const hemi = lat<0 ? "S" : "N"; if(lat<0) Nn += 10000000;
+  return {zone, hemi, E, N:Nn};
+}
+
+/* Proyección local para segmentos cortos */
+function localXY(p, o){ return [(p[1]-o[1])*K*RE*Math.cos(o[0]*K), (p[0]-o[0])*K*RE]; }
+function localLL(x, y, o){ return [o[0]+y/(RE*K), o[1]+x/(RE*K*Math.cos(o[0]*K))]; }
+function nearestOnSeg(p, a, b){ // p,a,b en XY
+  const dx=b[0]-a[0], dy=b[1]-a[1], L2=dx*dx+dy*dy; let t = L2 ? ((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2 : 0; t=Math.max(0,Math.min(1,t));
+  return [a[0]+t*dx, a[1]+t*dy];
+}
+function inRing(pt, ring){ let c=false; for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const a=ring[i], b=ring[j];
+  if(((a[0]>pt[0])!==(b[0]>pt[0])) && (pt[1] < (b[1]-a[1])*(pt[0]-a[0])/(b[0]-a[0])+a[1])) c=!c; } return c; }
+function inPoly(pt, poly){ if(!inRing(pt, poly[0])) return false; for(let k=1;k<poly.length;k++) if(inRing(pt, poly[k])) return false; return true; }
+
+/* ---------- KML ---------- */
+function parseCoords(txt){ return (txt||"").trim().split(/\s+/).map(s=>s.split(",").map(Number)).filter(a=>a.length>=2&&isFinite(a[0])&&isFinite(a[1])).map(a=>[a[1],a[0]]); }
+function parseKML(text){
+  const doc = new DOMParser().parseFromString(text, "text/xml");
+  if(doc.getElementsByTagName("parsererror").length) throw new Error("xml");
+  const feats = [];
+  for(const pm of doc.getElementsByTagName("Placemark")){
+    const nmEl = [...pm.children].find(c=>c.localName==="name");
+    const name = nmEl ? nmEl.textContent.trim() : "";
+    for(const pg of pm.getElementsByTagName("Polygon")){
+      const ob = pg.getElementsByTagName("outerBoundaryIs")[0];
+      const outer = parseCoords((ob||pg).getElementsByTagName("coordinates")[0]?.textContent);
+      if(outer.length<3) continue;
+      const rings=[outer];
+      for(const ib of pg.getElementsByTagName("innerBoundaryIs")){ const r=parseCoords(ib.getElementsByTagName("coordinates")[0]?.textContent); if(r.length>=3) rings.push(r); }
+      feats.push({t:"poly", name, rings});
+    }
+    for(const ls of pm.getElementsByTagName("LineString")){ const c=parseCoords(ls.getElementsByTagName("coordinates")[0]?.textContent); if(c.length>=2) feats.push({t:"line", name, coords:c}); }
+    for(const pt of pm.getElementsByTagName("Point")){ const c=parseCoords(pt.getElementsByTagName("coordinates")[0]?.textContent); if(c.length) feats.push({t:"pt", name, coord:c[0]}); }
+  }
+  return feats;
+}
+
+/* ---------- Estado ---------- */
+const S = { layers:[], pos:null, watch:null, follow:false, target:null, points:[], track:[], rec:false, wake:null, nid:1 };
+function save(k,v){ try{ localStorage.setItem("nc_"+k, JSON.stringify(v)); }catch(e){} }
+function load(k){ try{ const v=localStorage.getItem("nc_"+k); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function setStatus(msg, err){ const el=$("status"); el.textContent=msg||""; el.classList.toggle("err", !!err); }
+
+/* ---------- Mapa ---------- */
+const map = L.map("map", {zoomControl:true}).setView([10.6427,-71.6125], 12);
+L.control.scale({metric:true, imperial:false}).addTo(map);
+const bases = {
+  sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {maxZoom:21, maxNativeZoom:19, attribution:"Imagery © Esri, Maxar, Earthstar Geographics"}),
+  osm: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:21, maxNativeZoom:19, attribution:"© OpenStreetMap contributors"})
+};
+const roads = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", {maxZoom:21, maxNativeZoom:19, attribution:"Vías © Esri"});
+let cur = null, tileOk = 0, tileErr = 0;
+function onTileErr(){ tileErr++; if(!tileOk && tileErr>=4) setStatus("No se pudo cargar el mapa de fondo. Revise la conexión a internet; las capas KML y el GPS siguen funcionando.", true); }
+Object.values(bases).forEach(b=>{ b.on("tileload", ()=>{ tileOk++; if($("status").classList.contains("err") && /mapa de fondo/.test($("status").textContent)) setStatus(""); }); b.on("tileerror", onTileErr); });
+function setBase(k){
+  cur=k;
+  $("bSat").setAttribute("aria-pressed", k==="sat"); $("bOsm").setAttribute("aria-pressed", k==="osm");
+  $("roadsBox").hidden = k!=="sat";
+  applyBase();
+  save("base", k);
+}
+$("bSat").onclick=()=>setBase("sat"); $("bOsm").onclick=()=>setBase("osm");
+$("chkRoads").onchange=()=>applyBase();
+
+const meLayer = L.layerGroup().addTo(map);
+const trackLine = L.polyline([], {color:"#1E88E5", weight:3, opacity:.9, dashArray:"6 5"}).addTo(map);
+const ptsLayer = L.layerGroup().addTo(map);
+let tgtMarker = null, edgeLine = null;
+
+/* ---------- Capas ---------- */
+function drawLayer(ly){
+  ly.group.clearLayers();
+  const c = ly.color;
+  for(const f of ly.feats){
+    let g;
+    if(f.t==="poly") g = L.polygon(f.rings, {color:c, weight:3, fillColor:c, fillOpacity:.12});
+    else if(f.t==="line") g = L.polyline(f.coords, {color:c, weight:3});
+    else g = L.circleMarker(f.coord, {radius:6, color:"#FFFFFF", weight:2, fillColor:c, fillOpacity:1});
+    if(f.name) g.bindTooltip(esc(f.name), {sticky:f.t!=="pt"});
+    g.addTo(ly.group);
+  }
+}
+function addLayer(name, feats){
+  const ly = {id:S.nid++, name, feats, color:COLORS[(S.layers.length)%COLORS.length], visible:true, group:L.featureGroup()};
+  drawLayer(ly); ly.group.addTo(map); S.layers.push(ly);
+  const b = ly.group.getBounds(); if(b.isValid()) map.fitBounds(b, {padding:[30,30], maxZoom:18});
+  renderLayers(); updateNav();
+}
+function renderLayers(){
+  const ul=$("layers");
+  if(!S.layers.length){ ul.innerHTML = `<li class="empty" style="display:block">Aún no hay capas. Use «Cargar KML / KMZ»; puede seleccionar varios archivos a la vez.</li>`; return; }
+  ul.innerHTML = S.layers.map(ly=>{
+    const n = {poly:0,line:0,pt:0}; ly.feats.forEach(f=>n[f.t]++);
+    const meta = [n.poly&&`${n.poly} polígono${n.poly>1?"s":""}`, n.line&&`${n.line} línea${n.line>1?"s":""}`, n.pt&&`${n.pt} punto${n.pt>1?"s":""}`].filter(Boolean).join(" · ");
+    return `<li><button class="sw" type="button" data-a="color" data-id="${ly.id}" style="background:${ly.color}" aria-label="Cambiar color de ${esc(ly.name)}"></button>
+      <div><div class="nm">${esc(ly.name)}</div><div class="meta">${meta}</div></div>
+      <div class="bt"><label class="chk"><input type="checkbox" data-a="vis" data-id="${ly.id}" ${ly.visible?"checked":""}> Ver</label>
+      <button class="btn sm" type="button" data-a="zoom" data-id="${ly.id}">Zoom</button><button class="btn sm" type="button" data-a="del" data-id="${ly.id}">Quitar</button></div></li>`;
+  }).join("");
+}
+$("layers").addEventListener("click", e=>{
+  const el = e.target.closest("[data-a]"); if(!el || el.dataset.a==="vis") return;
+  const ly = S.layers.find(l=>l.id===+el.dataset.id); if(!ly) return;
+  if(el.dataset.a==="color"){ ly.color = COLORS[(COLORS.indexOf(ly.color)+1)%COLORS.length]; drawLayer(ly); renderLayers(); }
+  if(el.dataset.a==="zoom"){ const b=ly.group.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[30,30], maxZoom:18}); }
+  if(el.dataset.a==="del"){ map.removeLayer(ly.group); S.layers=S.layers.filter(l=>l!==ly); renderLayers(); updateNav(); }
+});
+$("layers").addEventListener("change", e=>{
+  const el=e.target; if(el.dataset.a!=="vis") return;
+  const ly=S.layers.find(l=>l.id===+el.dataset.id); if(!ly) return;
+  ly.visible=el.checked; if(ly.visible) ly.group.addTo(map); else map.removeLayer(ly.group); updateNav();
+});
+
+$("btnLoad").onclick=()=>$("file").click();
+$("file").onchange = async e=>{
+  const files=[...e.target.files]; e.target.value="";
+  const errs=[];
+  for(const f of files){
+    try{
+      let text;
+      if(/\.kmz$/i.test(f.name)){ const z=await JSZip.loadAsync(f); const k=Object.keys(z.files).find(n=>/(^|\/)doc\.kml$/i.test(n)) || Object.keys(z.files).find(n=>/\.kml$/i.test(n)); if(!k) throw 0; text=await z.files[k].async("string"); }
+      else text = await f.text();
+      const feats = parseKML(text);
+      if(!feats.length){ errs.push(`${f.name}: no contiene polígonos, líneas ni puntos`); continue; }
+      addLayer(f.name.replace(/\.(kml|kmz)$/i,""), feats);
+    }catch(err){ errs.push(`${f.name}: no se pudo leer el archivo`); }
+  }
+  setStatus(errs.length ? errs.join(" · ") : "", !!errs.length);
+};
+
+/* ---------- GPS ---------- */
+async function wakeOn(){ try{ if("wakeLock" in navigator && !S.wake){ S.wake = await navigator.wakeLock.request("screen"); S.wake.addEventListener("release", ()=>{ S.wake=null; }); } }catch(e){ S.wake=null; } }
+function wakeOff(){ try{ S.wake && S.wake.release(); }catch(e){} S.wake=null; }
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && S.watch!=null) wakeOn(); });
+
+function startGps(){
+  if(!("geolocation" in navigator)){ setStatus("Este navegador no ofrece ubicación.", true); return; }
+  setStatus("Buscando señal GPS…");
+  S.watch = navigator.geolocation.watchPosition(onPos, onPosErr, {enableHighAccuracy:true, maximumAge:2000, timeout:20000});
+  S.follow = true; wakeOn(); gpsButtons();
+}
+function stopGps(){
+  if(S.watch!=null) navigator.geolocation.clearWatch(S.watch);
+  S.watch=null; S.follow=false; wakeOff(); meLayer.clearLayers(); S.pos=null; gpsButtons(); updateNav(); setStatus("");
+}
+function gpsButtons(){
+  const on = S.watch!=null;
+  $("btnGps").classList.toggle("on", on); $("btnGps").setAttribute("aria-pressed", on); $("gpsTxt").textContent = on ? "Detener GPS" : "Activar GPS";
+  $("btnFollow").hidden = !on; $("btnFollow").classList.toggle("on", S.follow); $("btnFollow").setAttribute("aria-pressed", S.follow);
+  $("btnFollow").textContent = S.follow ? "Siguiendo mi posición" : "Seguir mi posición";
+}
+$("btnGps").onclick=()=>{ S.watch==null ? startGps() : stopGps(); };
+$("btnFollow").onclick=()=>{ S.follow=!S.follow; gpsButtons(); if(S.follow && S.pos) map.setView(S.pos.ll, Math.max(map.getZoom(),17)); };
+map.on("dragstart", ()=>{ if(S.follow){ S.follow=false; gpsButtons(); } });
+
+function onPos(p){
+  const c=p.coords, ll=[c.latitude, c.longitude];
+  const first = !S.pos;
+  S.pos = {ll, acc:c.accuracy, head:(c.heading!=null && !isNaN(c.heading) && c.speed>0.5) ? c.heading : null, speed:c.speed, alt:c.altitude, t:p.timestamp};
+  if(/Buscando/.test($("status").textContent)) setStatus("");
+  meLayer.clearLayers();
+  L.circle(ll, {radius:c.accuracy, color:"#1E88E5", weight:1, fillColor:"#1E88E5", fillOpacity:.12, interactive:false}).addTo(meLayer);
+  const cone = S.pos.head!=null ? `<span class="cone" style="transform:rotate(${S.pos.head}deg)"></span>` : "";
+  L.marker(ll, {icon:L.divIcon({className:"", html:`<div class="me">${cone}<span class="dot"></span></div>`, iconSize:[22,22], iconAnchor:[11,11]}), interactive:false, keyboard:false}).addTo(meLayer);
+  if(S.follow) map.setView(ll, first ? 17 : map.getZoom(), {animate:!first});
+  if(S.rec && c.accuracy<=30){
+    const last = S.track[S.track.length-1];
+    if(!last || dist(last, ll) >= 3){ S.track.push([+ll[0].toFixed(7), +ll[1].toFixed(7)]); if(!S.trackT0) S.trackT0=Date.now(); trackLine.setLatLngs(S.track); save("track", S.track); }
+  }
+  updateNav();
+}
+function onPosErr(err){
+  if(err.code===1){ setStatus("Permiso de ubicación denegado. Habilítelo en la configuración del navegador para este sitio.", true); stopGps(); setStatus("Permiso de ubicación denegado. Habilítelo en la configuración del navegador para este sitio.", true); }
+  else setStatus("Sin señal GPS por el momento. Siga en un lugar con vista despejada del cielo.", true);
+}
+
+/* ---------- Objetivo ---------- */
+function setTarget(ll, name){
+  S.target = {ll, name:name||""};
+  if(tgtMarker) map.removeLayer(tgtMarker);
+  tgtMarker = L.marker(ll, {icon:L.divIcon({className:"", html:`<div class="tgt"></div>`, iconSize:[22,22], iconAnchor:[11,11]}), keyboard:false}).addTo(map);
+  updateNav();
+}
+function clearTarget(){ S.target=null; if(tgtMarker) map.removeLayer(tgtMarker); tgtMarker=null; updateNav(); }
+map.on("click", e=>setTarget([e.latlng.lat, e.latlng.lng]));
+$("btnClrTgt").onclick = clearTarget;
+
+/* ---------- Navegación ---------- */
+function visibleFeats(){ const out=[]; S.layers.forEach(ly=>{ if(ly.visible) ly.feats.forEach(f=>out.push({f, ly})); }); return out; }
+function nearestEdge(ll){
+  let best=null;
+  const P=[0,0];
+  for(const {f, ly} of visibleFeats()){
+    const lines = f.t==="poly" ? f.rings.map(r=>[...r, r[0]]) : f.t==="line" ? [f.coords] : [];
+    for(const ln of lines){
+      for(let i=0;i<ln.length-1;i++){
+        const a=localXY(ln[i], ll), b=localXY(ln[i+1], ll), q=nearestOnSeg(P,a,b), d=Math.hypot(q[0],q[1]);
+        if(!best || d<best.d) best={d, ll:localLL(q[0],q[1],ll), name:f.name, layer:ly.name};
+      }
+    }
+  }
+  return best;
+}
+function relTurn(brg){
+  if(!S.pos || S.pos.head==null) return "";
+  const r = ((brg - S.pos.head + 540) % 360) - 180;
+  if(Math.abs(r) < 10) return " · al frente";
+  return ` · gire ${Math.round(Math.abs(r))}° a la ${r>0?"derecha":"izquierda"}`;
+}
+function setM(id, l){ const el=$(id); if(l) el.dataset.l=l; else delete el.dataset.l; }
+
+function updateNav(){
+  const P = S.pos;
+  // posición
+  if(P){
+    $("vPos").innerHTML = `${P.ll[0].toFixed(6)}°, ${P.ll[1].toFixed(6)}°`;
+    $("sPos").textContent = `±${Math.round(P.acc)} m${P.alt!=null?` · alt. GPS ${Math.round(P.alt)} m (elipsoidal)`:""}`;
+    setM("mPos", P.acc>25 ? "warn" : null);
+    const u = toUTM(P.ll[0], P.ll[1]);
+    $("vUtm").innerHTML = `<span class="copy" id="cpUtm" title="Copiar">E ${u.E.toFixed(1)}<br>N ${u.N.toFixed(1)}</span>`;
+    $("sUtm").textContent = `Zona ${u.zone}${u.hemi} · WGS84 ≈ REGVEN/SIRGAS`;
+    $("cpUtm").onclick = ()=>copy(`${u.zone}${u.hemi} E ${u.E.toFixed(1)} N ${u.N.toFixed(1)}`);
+    const sp = P.speed!=null && !isNaN(P.speed) ? P.speed*3.6 : null;
+    $("vMove").innerHTML = P.head!=null ? `${Math.round(P.head)}°<small>${card(P.head)}</small>` : "—";
+    $("sMove").textContent = sp!=null ? `${sp.toFixed(1)} km/h` : "Rumbo y velocidad con el equipo en movimiento";
+  } else {
+    $("vPos").textContent="—"; $("sPos").textContent = S.watch!=null ? "Buscando señal GPS…" : "Active el GPS para ver su ubicación"; setM("mPos", null);
+    $("vUtm").textContent="—"; $("sUtm").textContent="—"; $("vMove").textContent="—";
+  }
+  // área
+  const polys = visibleFeats().filter(x=>x.f.t==="poly");
+  if(!polys.length){ $("vArea").textContent="—"; $("sArea").textContent="Cargue un KML con polígonos"; setM("mArea", null); }
+  else if(!P){ $("vArea").textContent=`${polys.length} polígono${polys.length>1?"s":""}`; $("sArea").textContent="Active el GPS para saber si está dentro"; setM("mArea", null); }
+  else {
+    const inside = polys.filter(x=>inPoly(P.ll, x.f.rings));
+    if(inside.length){ $("vArea").textContent="Dentro"; $("sArea").textContent = inside.map(x=>x.f.name||x.ly.name).slice(0,3).join(" · "); setM("mArea","ok"); }
+    else { $("vArea").textContent="Fuera"; $("sArea").textContent="Fuera de los polígonos visibles"; setM("mArea","warn"); }
+  }
+  // borde
+  if(edgeLine){ map.removeLayer(edgeLine); edgeLine=null; }
+  const ne = P ? nearestEdge(P.ll) : null;
+  if(ne){
+    const b = bearing(P.ll, ne.ll);
+    $("vEdge").innerHTML = fmtD(ne.d);
+    $("sEdge").textContent = `${Math.round(b)}° ${card(b)}${relTurn(b)} · ${ne.name||ne.layer}`;
+    $("btnEdge").hidden=false; $("btnEdge").onclick=()=>setTarget(ne.ll, "Borde: "+(ne.name||ne.layer));
+    edgeLine = L.polyline([P.ll, ne.ll], {color:"#FFFFFF", weight:1.5, dashArray:"3 4", opacity:.9, interactive:false}).addTo(map);
+  } else { $("vEdge").textContent="—"; $("sEdge").textContent = S.layers.length ? (P?"Sin bordes visibles":"Active el GPS") : "Cargue un KML"; $("btnEdge").hidden=true; }
+  // objetivo
+  if(S.target){
+    $("btnClrTgt").hidden=false;
+    if(P){ const d=dist(P.ll, S.target.ll), b=bearing(P.ll, S.target.ll);
+      $("vTgt").innerHTML = fmtD(d); $("sTgt").textContent = `${Math.round(b)}° ${card(b)}${relTurn(b)}${S.target.name?" · "+S.target.name:""}`; setM("mTgt", d<=Math.max(10,P.acc) ? "ok" : null);
+      if(d<=Math.max(10,P.acc)) $("sTgt").textContent = "Llegó al objetivo" + (S.target.name?" · "+S.target.name:"");
+    } else { $("vTgt").textContent="Fijado"; $("sTgt").textContent=`${S.target.ll[0].toFixed(6)}°, ${S.target.ll[1].toFixed(6)}° · active el GPS para la distancia`; setM("mTgt", null); }
+  } else { $("vTgt").textContent="—"; $("sTgt").textContent="Toque el mapa para fijar un objetivo"; $("btnClrTgt").hidden=true; setM("mTgt", null); }
+  // recorrido
+  let len=0; for(let i=1;i<S.track.length;i++) len+=dist(S.track[i-1], S.track[i]);
+  $("vTrack").innerHTML = S.track.length>1 ? fmtD(len) : "—";
+  $("sTrack").textContent = S.rec ? `Grabando · ${S.track.length} vértices` : S.track.length>1 ? `Detenido · ${S.track.length} vértices` : "Sin grabar";
+  setM("mTrack", S.rec ? "ok" : null);
+  $("btnRec").textContent = S.rec ? "Detener" : (S.track.length ? "Continuar" : "Grabar recorrido");
+  $("btnRec").classList.toggle("on", S.rec);
+  $("btnClrTrack").hidden = !S.track.length || S.rec;
+  $("vPts").textContent = S.points.length;
+  pdfOut();
+}
+function copy(txt){ try{ navigator.clipboard.writeText(txt).then(()=>setStatus("Coordenadas copiadas."), ()=>setStatus(txt)); }catch(e){ setStatus(txt); } }
+
+/* ---------- Recorrido ---------- */
+$("btnRec").onclick=()=>{
+  if(!S.rec && S.watch==null) startGps();
+  S.rec=!S.rec; updateNav();
+};
+$("btnClrTrack").onclick=()=>{ S.track=[]; trackLine.setLatLngs([]); save("track", []); updateNav(); };
+
+/* ---------- Puntos marcados ---------- */
+function drawPoints(){
+  ptsLayer.clearLayers();
+  S.points.forEach(p=>{
+    L.marker(p.ll, {icon:L.divIcon({className:"", html:`<div class="mk"></div>`, iconSize:[14,14], iconAnchor:[7,7]}), keyboard:false})
+      .bindTooltip(`<strong>${esc(p.name)}</strong>${p.note?"<br>"+esc(p.note):""}`).addTo(ptsLayer);
+  });
+  const ul=$("points");
+  if(!S.points.length){ ul.innerHTML = `<li class="empty" style="display:block">Sin puntos. Use «Marcar punto» para registrar accesos, portones u obstáculos.</li>`; }
+  else ul.innerHTML = S.points.map((p,i)=>`<li><span class="sw" style="background:#ED6D15;transform:rotate(45deg);cursor:default"></span>
+    <div><div class="nm">${esc(p.name)}</div><div class="meta">${p.ll[0].toFixed(6)}, ${p.ll[1].toFixed(6)}${p.note?" · "+esc(p.note):""}</div></div>
+    <div class="bt"><button class="btn sm" type="button" data-a="go" data-i="${i}">Ir</button><button class="btn sm" type="button" data-a="del" data-i="${i}">Borrar</button></div></li>`).join("");
+  updateNav();
+}
+$("points").addEventListener("click", e=>{
+  const el=e.target.closest("[data-a]"); if(!el) return; const i=+el.dataset.i, p=S.points[i]; if(!p) return;
+  if(el.dataset.a==="go"){ setTarget(p.ll, p.name); map.setView(p.ll, Math.max(map.getZoom(),17)); }
+  if(el.dataset.a==="del"){ S.points.splice(i,1); save("points", S.points); drawPoints(); }
+});
+$("btnMark").onclick=()=>{ $("markPanel").hidden=false; $("inName").value=`Punto ${S.points.length+1}`; $("inNote").value=""; $("btnSaveGps").disabled=!S.pos; $("btnSaveTgt").disabled=!S.target; $("inName").focus(); $("markPanel").scrollIntoView({behavior:"smooth", block:"nearest"}); };
+$("btnCancelMark").onclick=()=>{ $("markPanel").hidden=true; };
+function addPoint(ll){
+  S.points.push({ll:[+ll[0].toFixed(7), +ll[1].toFixed(7)], name:$("inName").value.trim()||`Punto ${S.points.length+1}`, note:$("inNote").value.trim(), t:new Date().toISOString()});
+  save("points", S.points); drawPoints(); $("markPanel").hidden=true; setStatus("Punto guardado.");
+}
+$("btnSaveGps").onclick=()=>{ if(S.pos) addPoint(S.pos.ll); else setStatus("Active el GPS para guardar en su posición.", true); };
+$("btnSaveTgt").onclick=()=>{ if(S.target) addPoint(S.target.ll); else setStatus("Toque el mapa para fijar un objetivo primero.", true); };
+
+/* ---------- Exportación ---------- */
+function xml(s){ return String(s??"").replace(/[<>&'"]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c])); }
+function buildKML(){
+  const d = new Date().toISOString().slice(0,10);
+  let k = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Campo ${d}</name>\n<description>Navegador de Campo · Elaborado por Ing. Geodesta Mario Forgione L.</description>\n`;
+  k += `<Style id="pt"><IconStyle><color>ff156ded</color><scale>1.1</scale></IconStyle></Style><Style id="trk"><LineStyle><color>ffe5881e</color><width>3</width></LineStyle></Style>\n`;
+  k += `<Folder><name>Puntos marcados</name>\n` + S.points.map(p=>`<Placemark><name>${xml(p.name)}</name><description>${xml(p.note)}</description><TimeStamp><when>${p.t}</when></TimeStamp><styleUrl>#pt</styleUrl><Point><coordinates>${p.ll[1]},${p.ll[0]},0</coordinates></Point></Placemark>`).join("\n") + `\n</Folder>\n`;
+  if(S.track.length>1) k += `<Placemark><name>Recorrido</name><styleUrl>#trk</styleUrl><LineString><tessellate>1</tessellate><coordinates>${S.track.map(p=>`${p[1]},${p[0]},0`).join(" ")}</coordinates></LineString></Placemark>\n`;
+  return k + `</Document></kml>`;
+}
+$("btnExport").onclick=async()=>{
+  if(!S.points.length && S.track.length<2){ $("expNote").textContent="No hay puntos ni recorrido para exportar."; return; }
+  const kml = buildKML(), name = `campo_${new Date().toISOString().slice(0,10)}.kml`;
+  $("expBox").hidden=false; $("expText").value=kml;
+  let dl=null; try{ dl = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null; }catch(e){ dl=null; }
+  if(dl){
+    try{ await dl.save({filename:name, data:kml}); $("expNote").textContent=`Archivo listo: ${name}.`; }
+    catch(e){ $("expNote").textContent = e && e.code==="declined" ? "Descarga cancelada." : "La descarga no está disponible aquí: copie el contenido y guárdelo como .kml."; }
+    return;
+  }
+  try{
+    const u=URL.createObjectURL(new Blob([kml],{type:"application/vnd.google-earth.kml+xml"})), a=document.createElement("a");
+    a.href=u; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(u), 2000);
+    $("expNote").textContent=`Archivo listo: ${name}. Si la descarga no inicia, copie el contenido de abajo y guárdelo como .kml.`;
+  }catch(e){ $("expNote").textContent="La descarga no está disponible aquí: copie el contenido y guárdelo como .kml."; }
+  $("expBox").hidden=false; $("expText").value=kml;
+};
+
+/* ---------- Mapas PDF georreferenciados ---------- */
+const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const PDFLIB_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js";
+const NATIVE_DPI = {A3:200, A2:160, A1:130};
+S.pdfs = []; S.pdfShow = true; S.pdfOnly = !!load("pdfonly"); S.pdfOp = load("pdfop"); if(typeof S.pdfOp!=="number") S.pdfOp = 1;
+map.createPane("pdfPane"); map.getPane("pdfPane").style.zIndex = 350;
+
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=()=>rej(new Error("lib")); document.head.appendChild(s); }); }
+let libsP = null;
+function pdfLibs(){
+  if(!libsP) libsP = Promise.all([window.PDFLib ? 0 : loadScript(PDFLIB_URL), window.pdfjsLib ? 0 : loadScript(PDFJS_URL)])
+    .then(()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; })
+    .catch(e=>{ libsP=null; throw e; });
+  return libsP;
+}
+
+/* IndexedDB: los mapas quedan en el navegador de este dispositivo */
+let dbP = null;
+function idb(){
+  if(!dbP) dbP = new Promise((res,rej)=>{ try{ const r=indexedDB.open("nc_mapas",1);
+    r.onupgradeneeded=()=>r.result.createObjectStore("maps",{keyPath:"id"}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } });
+  return dbP;
+}
+async function dbDo(mode, fn){
+  const db = await idb();
+  return new Promise((res,rej)=>{ const t=db.transaction("maps",mode), q=fn(t.objectStore("maps")); let out;
+    if(q) q.onsuccess=()=>{ out=q.result; }; t.oncomplete=()=>res(out); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error("abort")); });
+}
+
+/* Lectura de la georreferencia ISO 32000 (/VP → Measure GEO) */
+function num(o){ return o && typeof o.asNumber==="function" ? o.asNumber() : NaN; }
+function nums(arr){ const out=[]; if(!arr || typeof arr.size!=="function") return out; for(let i=0;i<arr.size();i++) out.push(num(arr.lookup(i))); return out; }
+function txt(o){ try{ return o ? (o.decodeText ? o.decodeText() : String(o.asString ? o.asString() : o)) : ""; }catch(e){ return ""; } }
+async function readGeo(bytes){
+  const {PDFDocument, PDFName, PDFArray, PDFDict} = window.PDFLib;
+  let doc; try{ doc = await PDFDocument.load(bytes, {ignoreEncryption:true, updateMetadata:false}); }catch(e){ throw new Error("nopdf"); }
+  const page = doc.getPage(0), vps = page.node.lookupMaybe(PDFName.of("VP"), PDFArray);
+  if(!vps || !vps.size()) throw new Error("nogeo");
+  let vp = null;
+  for(let i=0;i<vps.size();i++){ const d=vps.lookup(i, PDFDict), m=d && d.lookupMaybe(PDFName.of("Measure"), PDFDict);
+    if(m && String(m.get(PDFName.of("Subtype")))==="/GEO"){ vp={d,m}; break; } }
+  if(!vp) throw new Error("nogeo");
+  const creator = doc.getCreator()||"", kw = doc.getKeywords()||"";
+  if(!/Generador de Mapas Base/i.test(creator) && !/GET-MAPAS-BASE/.test(kw)) throw new Error("foreign");
+  const gcs = vp.m.lookupMaybe(PDFName.of("GCS"), PDFDict);
+  const epsg = gcs ? num(gcs.get(PDFName.of("EPSG"))) : NaN, wkt = gcs ? txt(gcs.lookup(PDFName.of("WKT"))) : "";
+  if(epsg!==3857 && !/Pseudo.Mercator|3857/i.test(wkt)) throw new Error("foreign");
+  const bbox = nums(vp.d.lookup(PDFName.of("BBox"))), g = nums(vp.m.lookup(PDFName.of("GPTS"))), lp = nums(vp.m.lookup(PDFName.of("LPTS")));
+  if(bbox.length!==4 || g.length!==8 || lp.join()!=="0,0,0,1,1,1,1,0" || g.some(v=>!isFinite(v))) throw new Error("foreign");
+  const lats=[g[0],g[2],g[4],g[6]], lons=[g[1],g[3],g[5],g[7]];
+  const s=Math.min(...lats), n=Math.max(...lats), w=Math.min(...lons), e=Math.max(...lons);
+  if(!(n>s && e>w) || n>85 || s<-85) throw new Error("foreign");
+  // metadatos: título, hoja y escala (firma del Generador o cálculo desde la geometría)
+  const subj = doc.getSubject()||"", title = (doc.getTitle()||"").trim();
+  const sz = page.getSize(), mm = [sz.width, sz.height].map(v=>v/72*25.4).sort((a,b)=>a-b);
+  const sheet = (kw.match(/hoja=(A\d)/)||subj.match(/Hoja (A\d)/)||[])[1] || (Math.abs(mm[0]-297)<3?"A3":Math.abs(mm[0]-420)<3?"A2":Math.abs(mm[0]-594)<3?"A1":"");
+  let scale = +((kw.match(/escala=(\d+)/)||subj.match(/1:(\d+)/)||[])[1]||0);
+  if(!scale){ const latc=(s+n)/2, ground=(e-w)*K*6378137*Math.cos(latc*K), paper=Math.abs(bbox[2]-bbox[0])/72*0.0254; scale=Math.round(ground/paper); }
+  return {bbox:[Math.min(bbox[0],bbox[2]),Math.min(bbox[1],bbox[3]),Math.max(bbox[0],bbox[2]),Math.max(bbox[1],bbox[3])], bounds:[[s,w],[n,e]], title, sheet, scale, pages:doc.getPageCount()};
+}
+
+/* Render de la zona del mapa (BBox) a imagen, con la resolución que admite el equipo */
+async function renderArea(bytes, geo){
+  const pdf = await window.pdfjsLib.getDocument({data:bytes, isEvalSupported:false}).promise;
+  try{
+    const page = await pdf.getPage(1), view = page.view, b = geo.bbox, bw = b[2]-b[0], bh = b[3]-b[1];
+    const mem = navigator.deviceMemory || 4, maxArea = mem<=2 ? 6e6 : mem<=4 ? 12e6 : 16e6, maxSide = 8192;
+    const nat = NATIVE_DPI[geo.sheet] || 200;
+    let dpi = Math.min(nat, 200);
+    dpi = Math.min(dpi, Math.sqrt(maxArea/(bw*bh))*72, maxSide/Math.max(bw,bh)*72);
+    const sc = dpi/72, W = Math.round(bw*sc), H = Math.round(bh*sc);
+    const vp = page.getViewport({scale:sc, rotation:0, offsetX:-(b[0]-view[0])*sc, offsetY:-(view[3]-b[3])*sc});
+    const cv = document.createElement("canvas"); cv.width=W; cv.height=H;
+    const cx = cv.getContext("2d"); cx.fillStyle="#FFFFFF"; cx.fillRect(0,0,W,H);
+    await page.render({canvasContext:cx, viewport:vp, annotationMode:0}).promise;
+    const blob = await new Promise((res,rej)=>cv.toBlob(x=>x?res(x):rej(new Error("canvas")), "image/jpeg", 0.9));
+    cv.width = cv.height = 1;
+    return {blob, W, H, dpi:Math.round(dpi), reduced: dpi < nat*0.9};
+  } finally { pdf.destroy(); }
+}
+
+function overlayOf(m){
+  if(!m.url) m.url = URL.createObjectURL(new Blob([m.img], {type:"image/jpeg"}));
+  if(!m.ov) m.ov = L.imageOverlay(m.url, m.bounds, {pane:"pdfPane", opacity:S.pdfOp, interactive:false, attribution:"Mapa PDF"});
+  return m.ov;
+}
+function applyPdf(){
+  S.pdfs.forEach(m=>{ const ov=overlayOf(m); if(S.pdfShow && m.visible) ov.addTo(map); else map.removeLayer(ov); ov.setOpacity(S.pdfOp); });
+  pdfCtl.update(); pdfOut();
+}
+function applyBase(){
+  const only = S.pdfOnly && S.pdfs.length;
+  Object.values(bases).forEach(b=>map.removeLayer(b)); map.removeLayer(roads);
+  if(!only){ bases[cur].addTo(map); bases[cur].bringToBack(); if(cur==="sat" && $("chkRoads").checked) roads.addTo(map); }
+}
+
+const fmtMB = b => b>=1e9 ? (b/1e9).toFixed(1).replace(".",",")+" GB" : (b/1e6).toFixed(1).replace(".",",")+" MB";
+const fmtN = n => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g," ");
+let persistNote = "";
+async function storeInfo(){
+  let t = "";
+  try{ if(navigator.storage && navigator.storage.estimate){ const e=await navigator.storage.estimate(); t = `Espacio usado por este sitio: ${fmtMB(e.usage||0)} de ${fmtMB(e.quota||0)} disponibles.`; } }catch(e){}
+  $("pdfStore").textContent = [t, persistNote].filter(Boolean).join(" ");
+}
+async function askPersist(){
+  try{ if(!(navigator.storage && navigator.storage.persist)) return;
+    if(await navigator.storage.persisted()) { persistNote=""; return; }
+    persistNote = (await navigator.storage.persist()) ? "" : "El navegador no garantizó almacenamiento permanente: podría borrar los mapas si el equipo se queda sin espacio. Conserve los PDF originales.";
+  }catch(e){}
+}
+
+function renderPdfs(){
+  const ul = $("pdfList");
+  if(!S.pdfs.length){ ul.innerHTML = `<li class="empty" style="display:block">Aún no hay mapas. Use «Cargar mapa PDF» con un PDF del Generador de Mapas Base.</li>`; }
+  else ul.innerHTML = S.pdfs.map(m=>{
+    const d = new Date(m.date).toLocaleDateString("es", {day:"2-digit", month:"2-digit", year:"numeric"});
+    const meta = [m.sheet&&`Hoja ${m.sheet}`, m.scale&&`1:${fmtN(m.scale)}`, d, fmtMB(m.img.byteLength), `${m.dpi} ppp`].filter(Boolean).join(" · ");
+    return `<li class="${m.visible?"":"off"}"><img class="thumb" src="${m.url||(m.url=URL.createObjectURL(new Blob([m.img],{type:"image/jpeg"})))}" alt="">
+      <div><div class="nm">${esc(m.name)}</div><div class="meta">${meta}</div></div>
+      <div class="bt"><label class="chk"><input type="checkbox" data-p="vis" data-id="${m.id}" ${m.visible?"checked":""}> Ver</label>
+      <button class="btn sm" type="button" data-p="zoom" data-id="${m.id}">Zoom</button><button class="btn sm" type="button" data-p="del" data-id="${m.id}">Eliminar</button></div></li>`;
+  }).join("");
+  $("pdfOp").value = Math.round((1-S.pdfOp)*100); $("pdfOpV").textContent = `${$("pdfOp").value} %`;
+  $("pdfOnly").checked = S.pdfOnly; $("pdfOnly").disabled = !S.pdfs.length;
+  storeInfo();
+}
+async function putMap(m){ const {ov, url, ...rec} = m; return dbDo("readwrite", st=>st.put(rec)); }
+$("pdfList").addEventListener("click", async e=>{
+  const el = e.target.closest("[data-p]"); if(!el || el.dataset.p==="vis") return;
+  const m = S.pdfs.find(x=>x.id===el.dataset.id); if(!m) return;
+  if(el.dataset.p==="zoom"){ S.follow=false; gpsButtons(); if(!S.pdfShow){ S.pdfShow=true; } if(!m.visible){ m.visible=true; putMap(m).catch(()=>{}); renderPdfs(); } applyPdf(); map.fitBounds(m.bounds, {padding:[12,12]}); }
+  if(el.dataset.p==="del"){
+    if(!el.classList.contains("warnb")){ el.classList.add("warnb"); el.textContent="¿Eliminar?"; setTimeout(()=>{ if(el.isConnected){ el.classList.remove("warnb"); el.textContent="Eliminar"; } }, 3500); return; }
+    if(m.ov) map.removeLayer(m.ov); if(m.url) URL.revokeObjectURL(m.url);
+    S.pdfs = S.pdfs.filter(x=>x!==m);
+    try{ await dbDo("readwrite", st=>st.delete(m.id)); }catch(err){}
+    if(!S.pdfs.length) applyBase();
+    renderPdfs(); applyPdf(); setStatus(`Mapa «${m.name}» eliminado de este dispositivo.`);
+  }
+});
+$("pdfList").addEventListener("change", e=>{
+  const el = e.target; if(el.dataset.p!=="vis") return;
+  const m = S.pdfs.find(x=>x.id===el.dataset.id); if(!m) return;
+  m.visible = el.checked; if(m.visible) S.pdfShow = true;
+  putMap(m).catch(()=>{}); renderPdfs(); applyPdf();
+});
+$("pdfOp").addEventListener("input", ()=>{ S.pdfOp = 1 - $("pdfOp").value/100; $("pdfOpV").textContent = `${$("pdfOp").value} %`; S.pdfs.forEach(m=>m.ov && m.ov.setOpacity(S.pdfOp)); save("pdfop", S.pdfOp); });
+$("pdfOnly").addEventListener("change", ()=>{ S.pdfOnly = $("pdfOnly").checked; save("pdfonly", S.pdfOnly); applyBase(); });
+
+/* Botón rápido «PDF» sobre el mapa */
+const pdfCtl = L.control({position:"topleft"});
+pdfCtl.onAdd = ()=>{ const d=L.DomUtil.create("div","leaflet-bar leaflet-control pdfbtn");
+  d.innerHTML = `<a href="#" role="button" title="Mostrar u ocultar los mapas PDF" aria-label="Mostrar u ocultar los mapas PDF">PDF</a>`;
+  L.DomEvent.disableClickPropagation(d);
+  d.firstChild.addEventListener("click", ev=>{ ev.preventDefault(); S.pdfShow=!S.pdfShow; applyPdf(); });
+  return d; };
+pdfCtl.update = ()=>{ const c=pdfCtl.getContainer(); if(!c) return; const any=S.pdfs.some(m=>m.visible);
+  c.style.display = S.pdfs.length ? "" : "none"; const a=c.firstChild; a.classList.toggle("on", S.pdfShow && any); a.setAttribute("aria-pressed", String(S.pdfShow && any)); };
+pdfCtl.addTo(map);
+
+/* Aviso «Fuera del mapa PDF» */
+const outCtl = L.control({position:"topright"});
+outCtl.onAdd = ()=>{ const d=L.DomUtil.create("div","leaflet-control pdfout"); d.hidden=true; d.setAttribute("role","status");
+  L.DomEvent.disableClickPropagation(d);
+  d.addEventListener("click", ()=>{ if(outCtl.m){ S.follow=false; gpsButtons(); map.fitBounds(L.latLngBounds(outCtl.m.bounds).extend(S.pos.ll), {padding:[30,30]}); } });
+  return d; };
+outCtl.addTo(map);
+function pdfOut(){
+  const box = outCtl.getContainer(), vis = S.pdfShow ? S.pdfs.filter(m=>m.visible) : [];
+  if(!S.pos || !vis.length){ box.hidden=true; outCtl.m=null; return; }
+  const p = S.pos.ll; let best=null;
+  for(const m of vis){ const [[s,w],[n,e]] = m.bounds;
+    if(p[0]>=s && p[0]<=n && p[1]>=w && p[1]<=e){ box.hidden=true; outCtl.m=null; return; }
+    const q = [Math.min(n,Math.max(s,p[0])), Math.min(e,Math.max(w,p[1]))], d = dist(p,q);
+    if(!best || d<best.d) best = {d, q, m}; }
+  const b = bearing(p, best.q);
+  box.innerHTML = `Fuera del mapa PDF · <b>${fmtD(best.d).replace(/<\/?small>/g," ").trim()}</b> al ${Math.round(b)}° ${card(b)}<br><span style="font-weight:500">${esc(best.m.name)}</span>`;
+  box.hidden=false; outCtl.m = best.m;
+}
+
+/* Carga de archivos PDF */
+$("btnPdf").onclick = ()=>$("pdfFile").click();
+$("pdfFile").onchange = async e=>{
+  const files = [...e.target.files]; e.target.value = "";
+  if(!files.length) return;
+  const msgs = [], warns = []; let last = null;
+  $("btnPdf").disabled = true;
+  try{
+    setStatus("Preparando el lector de PDF…");
+    try{ await pdfLibs(); }catch(err){ setStatus("No se pudo cargar el lector de PDF. La primera carga de un mapa requiere conexión a internet.", true); return; }
+    for(const f of files){
+      try{
+        setStatus(`Leyendo ${f.name}…`);
+        if(!/\.pdf$/i.test(f.name) && f.type!=="application/pdf") throw new Error("nopdf");
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        const geo = await readGeo(bytes);
+        setStatus(`Procesando ${f.name}…`);
+        const r = await renderArea(bytes.slice(), geo);
+        const m = {id:`m${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`, name: geo.title || f.name.replace(/\.pdf$/i,""), file:f.name,
+          sheet:geo.sheet, scale:geo.scale, date:Date.now(), bounds:geo.bounds, img: await r.blob.arrayBuffer(), w:r.W, h:r.H, dpi:r.dpi, visible:true};
+        const same = S.pdfs.find(x=>x.name===m.name && JSON.stringify(x.bounds)===JSON.stringify(m.bounds));
+        if(same){ if(same.ov) map.removeLayer(same.ov); if(same.url) URL.revokeObjectURL(same.url); S.pdfs = S.pdfs.filter(x=>x!==same);
+          try{ await dbDo("readwrite", st=>st.delete(same.id)); }catch(err){} warns.push(`${f.name}: ya estaba en «Mis mapas»; se reemplazó`); }
+        try{ await putMap(m); }catch(err){ warns.push(`${f.name}: no se pudo guardar en el dispositivo (espacio o modo privado); se verá solo en esta sesión`); }
+        S.pdfs.push(m); last = m;
+        if(r.reduced) warns.push(`${f.name}: resolución reducida a ${r.dpi} ppp por la memoria del equipo`);
+        if(geo.pages>1) warns.push(`${f.name}: se usó solo la primera página`);
+      }catch(err){
+        const k = err && err.message;
+        msgs.push(k==="nogeo" ? `${f.name}: este PDF no está georreferenciado.`
+          : k==="foreign" ? `${f.name}: use un PDF creado con el Generador de Mapas Base para la mejor experiencia.`
+          : k==="nopdf" ? `${f.name}: no es un PDF válido.` : `${f.name}: no se pudo procesar el mapa.`);
+      }
+    }
+    if(last){ await askPersist(); S.pdfShow = true; renderPdfs(); applyPdf(); applyBase();
+      S.follow=false; gpsButtons(); map.fitBounds(last.bounds, {padding:[12,12]}); }
+    const all = msgs.concat(warns);
+    setStatus(all.length ? all.join(" · ") : `Mapa «${last.name}» cargado y guardado en este dispositivo.`, !!msgs.length);
+  } finally { $("btnPdf").disabled = false; }
+};
+async function initPdfs(){
+  try{ const recs = await dbDo("readonly", st=>st.getAll()) || [];
+    S.pdfs = recs.sort((a,b)=>a.date-b.date);
+  }catch(e){ S.pdfs = []; }
+  renderPdfs(); applyPdf(); applyBase();
+}
+
+/* ---------- Inicio ---------- */
+S.points = load("points") || [];
+S.track = load("track") || [];
+trackLine.setLatLngs(S.track);
+setBase(load("base")==="osm" ? "osm" : "sat");
+renderLayers(); drawPoints(); initPdfs();
+})();
+</script>
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>

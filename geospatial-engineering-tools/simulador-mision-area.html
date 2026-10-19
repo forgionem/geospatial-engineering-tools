@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de Misiones de Área</title>
+<meta name="author" content="Ing. Geodesta Mario Forgione L.">
+<meta name="description" content="Entorno libre de práctica para configurar misiones de Área de fotogrametría y LiDAR siguiendo el flujo de parámetros de DJI Pilot 2.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#EEF2F6; --panel:#FFFFFF; --field:#F2F5F9; --ink:#0F2A40; --muted:#55687B; --line:#D3DCE6;
+  --brand:#145487; --brand-ink:#FFFFFF; --accent:#ED6D15; --accent-ink:#FFFFFF; --brandsoft:#DCE8F3;
+  --ok:#2E7A4D; --okbg:#E5F2EA; --warn:#B4600F; --warnbg:#FDF1E7; --bad:#B42318; --badbg:#FCEBE9;
+  --f-disp:'Orbitron','Arial Narrow',Arial,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0B1622; --panel:#112233; --field:#16293D; --ink:#E3ECF5; --muted:#8FA3B8; --line:#22384F;
+  --brand:#4F8FC7; --brand-ink:#08121C; --brandsoft:#18324B;
+  --ok:#5DBB86; --okbg:#12261B; --warn:#F0A04B; --warnbg:#2A1E12; --bad:#F2796B; --badbg:#2D1816; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:14px; line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); padding-block:18px 28px}
+.wrap{max-width:1240px; margin:0 auto; display:flex; flex-direction:column; gap:16px}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+header h1{font-family:var(--f-disp); font-weight:800; font-size:clamp(21px,3.8vw,30px); letter-spacing:.04em; color:var(--brand); margin:0; line-height:1.05; text-transform:uppercase; text-wrap:balance}
+header h1 .u{color:var(--accent)}
+header h1 small{display:block; font-size:.5em; letter-spacing:.08em; color:var(--muted); margin-top:6px}
+.sub{color:var(--muted); margin:8px 0 0; font-size:13.5px; max-width:80ch}
+.by{font:500 12px var(--f-mono); margin-top:8px}
+a.li{color:var(--brand); font-weight:600; text-decoration:none; border-bottom:1px solid currentColor}
+a.li:hover{color:var(--accent)}
+
+.layout{display:grid; grid-template-columns:minmax(0,1.3fr) minmax(360px,1fr); gap:16px; align-items:start}
+@media (max-width:920px){.layout{grid-template-columns:minmax(0,1fr)}}
+.left{display:flex; flex-direction:column; gap:12px; min-width:0}
+@media (max-width:920px){.left{position:static}}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:8px; min-width:0}
+.sec{padding:12px 14px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:10px}
+.sec:first-child{border-top:0}
+.ptitle{display:flex; gap:8px; align-items:baseline; margin:0; font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand)}
+.ptitle .n{font:500 11.5px var(--f-mono); color:var(--accent)}
+.note{font-size:12px; color:var(--muted); margin:0}
+
+#map{height:430px; border-radius:8px 8px 0 0; background:var(--field); z-index:0}
+@media (max-width:640px){#map{height:320px}}
+.maptools{display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:10px 12px; border-top:1px solid var(--line)}
+.btn{font:600 12.5px var(--f-body); padding:7px 11px; border-radius:5px; border:1px solid var(--line); background:var(--field); color:var(--ink); cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.btn.sec2{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+.status{font-size:12px; color:var(--muted); margin-left:auto}
+
+.kpis{display:grid; grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.k{padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0}
+.k .l{font:600 10.5px var(--f-body); text-transform:uppercase; letter-spacing:.07em; color:var(--muted)}
+.k .v{font:600 19px var(--f-disp); letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
+.k .v small{font:500 11.5px var(--f-mono); color:var(--muted); margin-left:3px}
+.k .s{font:400 11px var(--f-mono); color:var(--muted); overflow-wrap:anywhere}
+.k.hi .v{color:var(--accent)}
+.msgs{display:flex; flex-direction:column; gap:6px; padding:12px 14px}
+.msg{font-size:12.5px; padding:7px 10px; border-radius:5px; border-left:3px solid var(--brand); background:var(--field)}
+.msg[data-l="warn"]{border-left-color:var(--warn); background:var(--warnbg)}
+.msg[data-l="bad"]{border-left-color:var(--bad); background:var(--badbg)}
+.msg[data-l="ok"]{border-left-color:var(--ok); background:var(--okbg)}
+
+details.grp{border-top:1px solid var(--line)}
+details.grp:first-of-type{border-top:0}
+details.grp > summary{list-style:none; cursor:pointer; padding:11px 14px; display:flex; align-items:center; gap:8px; font:700 12.5px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand)}
+details.grp > summary::-webkit-details-marker{display:none}
+details.grp > summary::after{content:"+"; margin-left:auto; font:500 16px var(--f-mono); color:var(--muted)}
+details.grp[open] > summary::after{content:"–"}
+details.grp > summary .en{font:500 11px var(--f-mono); letter-spacing:0; text-transform:none; color:var(--muted)}
+.rows{padding:0 14px 12px; display:flex; flex-direction:column; gap:10px}
+.row{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,200px); gap:10px; align-items:center}
+.row > label{font-size:13px; line-height:1.25}
+.row > label .en{display:block; font:400 11px var(--f-mono); color:var(--muted)}
+.row.full{grid-template-columns:minmax(0,1fr)}
+select,input[type=number]{width:100%; font:500 13px var(--f-body); color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:5px; padding:7px 8px; min-width:0}
+input[type=number]{font-family:var(--f-mono)}
+.unit{display:flex; align-items:center; gap:6px}
+.unit span{font:500 11.5px var(--f-mono); color:var(--muted); white-space:nowrap}
+.range{display:flex; align-items:center; gap:8px}
+.range input[type=range]{flex:1; accent-color:var(--accent); min-width:0}
+.range output{font:600 12.5px var(--f-mono); min-width:44px; text-align:right}
+.tog{display:flex; gap:4px}
+.tog button{flex:1; font:600 12px var(--f-body); padding:7px 6px; border:1px solid var(--line); background:var(--field); color:var(--ink); border-radius:5px; cursor:pointer}
+.tog button[aria-pressed="true"]{background:var(--brand); color:var(--brand-ink); border-color:var(--brand)}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+.hint{font-size:11.5px; color:var(--muted); margin:-4px 0 0}
+
+.legal{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:28px; padding:20px 22px}
+@media (max-width:820px){.legal{grid-template-columns:minmax(0,1fr)}}
+.legal h2{font:700 13px var(--f-disp); letter-spacing:.07em; text-transform:uppercase; color:var(--brand); margin:0 0 10px}
+.legal p{margin:0 0 9px; font-size:12.5px; color:var(--muted); max-width:75ch}
+.srcs{margin:0; padding:0; list-style:none; font-size:12.5px; display:flex; flex-direction:column; gap:5px}
+.srcs li{color:var(--muted); overflow-wrap:anywhere}
+.srcs a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+.srcs a:hover{color:var(--accent); border-bottom-color:var(--accent)}
+.srcs .grp{font:600 10.5px var(--f-body); letter-spacing:.08em; text-transform:uppercase; color:var(--brand); margin-top:6px}
+footer{color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; border-top:1px solid var(--line); padding-top:12px}
+footer b{color:var(--brand); font-weight:600}
+.vtx{width:12px!important; height:12px!important; margin:-6px 0 0 -6px!important; border-radius:50%; background:#FFFFFF; border:2.5px solid #ED6D15; cursor:move}
+.home{width:18px!important; height:18px!important; margin:-9px 0 0 -9px!important; border-radius:4px; background:#145487; color:#FFF; font:700 11px/18px 'IBM Plex Sans',sans-serif; text-align:center; border:2px solid #FFF; box-shadow:0 1px 4px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Simulador de misiones <span class="u">de área</span><small>Flujo de parámetros DJI Pilot 2 · fotogrametría y LiDAR</small></h1>
+  <p class="sub">Entorno libre de práctica: dibuje o cargue un área, elija aeronave y carga útil, y configure cada parámetro en el mismo orden en que aparece en Pilot 2. Las líneas de vuelo, el GSD, la densidad de puntos, el tiempo y las baterías se recalculan al instante.</p>
+  <div class="by">Elaborado por Ing. Geodesta Mario Forgione L. · <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">LinkedIn ↗</a></div>
+</header>
+
+<div class="layout">
+  <div class="left">
+    <section class="panel" aria-label="Mapa del área">
+      <div id="map" role="img" aria-label="Mapa con el área de la misión y las líneas de vuelo"></div>
+      <div class="maptools">
+        <button class="btn" type="button" id="bDraw">Dibujar área</button>
+        <button class="btn" type="button" id="bFinish" disabled>Cerrar polígono</button>
+        <button class="btn" type="button" id="bKml">Cargar KML/KMZ</button>
+        <button class="btn" type="button" id="bEx">Área de ejemplo</button>
+        <button class="btn" type="button" id="bClear">Borrar</button>
+        <button class="btn sec2" type="button" id="bExport" disabled>Exportar ruta (KML)</button>
+        <input type="file" id="fKml" accept=".kml,.kmz" hidden>
+        <span class="status" id="mapStatus">Dibuje un área o cargue el ejemplo.</span>
+      </div>
+    </section>
+    <section class="panel" aria-label="Resultados de la misión">
+      <div class="kpis" id="kpis"></div>
+      <div class="msgs" id="msgs"></div>
+    </section>
+  </div>
+
+  <aside class="panel" aria-label="Parámetros de la misión">
+    <details class="grp" open>
+      <summary>01 · Aeronave y carga útil <span class="en">Aircraft · Payload</span></summary>
+      <div class="rows">
+        <div class="row"><label for="pPlat">Aeronave</label><select id="pPlat"></select></div>
+        <div class="row"><label for="pPay">Carga útil<span class="en">Payload</span></label><select id="pPay"></select></div>
+        <div class="row" id="rLens"><label for="pLens">Lente</label><select id="pLens"></select></div>
+        <div class="row" id="rColl"><label>Tipo de colección<span class="en">Collection Type</span></label><div class="tog" id="pColl"></div></div>
+        <p class="hint" id="payInfo"></p>
+      </div>
+    </details>
+
+    <details class="grp" open>
+      <summary>02 · Misión <span class="en">Mission settings</span></summary>
+      <div class="rows">
+        <div class="row"><label for="pAltMode">Modo de altura<span class="en">ASL / ALT</span></label>
+          <select id="pAltMode"><option value="ALT">Relativa al despegue (ALT)</option><option value="ASL">Sobre el nivel del mar (ASL)</option></select></div>
+        <div class="row" id="rTakeoffElev" hidden><label for="pTakeoffElev">Elevación del punto de despegue<span class="en">Takeoff point ASL</span></label><div class="unit"><input type="number" id="pTakeoffElev" value="0" step="1"><span>m</span></div></div>
+        <div class="row"><label for="pAlt">Altura de ruta<span class="en" id="altEn">Route Altitude (ALT)</span></label><div class="unit"><input type="number" id="pAlt" value="100" min="10" max="1500" step="1"><span>m</span></div></div>
+        <div class="row" id="rGsd"><label for="pGsd">GSD objetivo<span class="en">Ortho GSD</span></label><div class="unit"><input type="number" id="pGsd" step="0.01" min="0.1"><span>cm/px</span></div></div>
+        <div class="row"><label for="pTarget">Superficie objetivo respecto al despegue<span class="en">Target Surface to Takeoff Point</span></label><div class="unit"><input type="number" id="pTarget" value="0" step="1"><span>m</span></div></div>
+        <div class="row"><label for="pSafe">Altura segura de despegue<span class="en">Safe Takeoff Altitude</span></label><div class="unit"><input type="number" id="pSafe" value="30" min="5" step="1"><span>m</span></div></div>
+        <div class="row"><label>Velocidad<span class="en">Speed</span></label><div class="tog" id="pSpeedMode"><button type="button" data-v="max" aria-pressed="true">Máx. permitida</button><button type="button" data-v="custom" aria-pressed="false">Definida</button></div></div>
+        <div class="row" id="rSpeed"><label for="pSpeed">Velocidad definida</label><div class="unit"><input type="number" id="pSpeed" value="10" min="1" max="15" step="0.5"><span>m/s</span></div></div>
+        <div class="row"><label for="pCourse">Ángulo de curso<span class="en">Course Angle</span></label><div class="range"><input type="range" id="pCourse" min="0" max="359" value="0"><output id="oCourse">0°</output></div></div>
+        <div class="row" id="rAutoCourse"><label></label><button class="btn" type="button" id="bAutoCourse">Alinear al lado más largo</button></div>
+        <div class="row" id="rElevOpt"><label>Optimización de elevación<span class="en">Elevation Optimization</span></label><div class="tog" id="pElevOpt"><button type="button" data-v="0" aria-pressed="true">No</button><button type="button" data-v="1" aria-pressed="false">Sí</button></div></div>
+        <div class="row" id="rImu"><label>Calibración IMU<span class="en">IMU Calibration</span></label><div class="tog" id="pImu"><button type="button" data-v="0" aria-pressed="false">No</button><button type="button" data-v="1" aria-pressed="true">Sí</button></div></div>
+        <div class="row"><label>Seguimiento del terreno<span class="en">Terrain Follow</span></label><div class="tog" id="pTerrain"><button type="button" data-v="0" aria-pressed="true">No</button><button type="button" data-v="1" aria-pressed="false">Sí</button></div></div>
+        <div class="row"><label for="pEnd">Al finalizar<span class="en">Upon Completion</span></label>
+          <select id="pEnd"><option value="rth">Regresar al punto de origen (RTH)</option><option value="hover">Mantener en vuelo (Hover)</option><option value="land">Aterrizar (Land)</option><option value="first">Ir al primer punto</option></select></div>
+      </div>
+    </details>
+
+    <details class="grp" open>
+      <summary>03 · Avanzados <span class="en">Advanced settings</span></summary>
+      <div class="rows">
+        <div class="row" id="rSideL"><label for="pSideL">Traslape lateral LiDAR<span class="en">Side Overlap (LiDAR)</span></label><div class="range"><input type="range" id="pSideL" min="10" max="90" value="50"><output id="oSideL">50 %</output></div></div>
+        <div class="row" id="rFwd"><label for="pFwd">Traslape frontal (cámara)<span class="en">Forward Overlap (Visible)</span></label><div class="range"><input type="range" id="pFwd" min="10" max="90" value="80"><output id="oFwd">80 %</output></div></div>
+        <div class="row" id="rSide"><label for="pSide">Traslape lateral (cámara)<span class="en">Side Overlap (Visible)</span></label><div class="range"><input type="range" id="pSide" min="10" max="90" value="70"><output id="oSide">70 %</output></div></div>
+        <div class="row"><label for="pMargin">Margen<span class="en">Margin</span></label><div class="unit"><input type="number" id="pMargin" value="0" min="0" max="500" step="1"><span>m</span></div></div>
+        <div class="row"><label for="pPhoto">Modo de foto<span class="en">Photo Mode</span></label>
+          <select id="pPhoto"><option value="dist">Disparo por distancia (Distance Interval Shot)</option><option value="time">Disparo por tiempo (Timed Interval Shot)</option></select></div>
+        <div class="row"><label for="pStart">Punto de inicio de la ruta<span class="en">Route Start Point</span></label>
+          <select id="pStart"><option value="0">Esquina 1</option><option value="1">Esquina 2</option><option value="2">Esquina 3</option><option value="3">Esquina 4</option></select></div>
+      </div>
+    </details>
+
+    <details class="grp" open>
+      <summary>04 · Carga útil <span class="en">Payload settings</span></summary>
+      <div class="rows">
+        <div id="lidarRows" class="rows" style="padding:0">
+          <div class="row"><label for="pRet">Modo de retorno<span class="en">Return Mode</span></label><select id="pRet"></select></div>
+          <div class="row"><label for="pRate">Frecuencia de muestreo<span class="en">Sampling Rate</span></label><select id="pRate"></select></div>
+          <div class="row"><label for="pScan">Modo de escaneo<span class="en">Scanning Mode</span></label><select id="pScan"></select></div>
+          <div class="row"><label>Colorización RGB<span class="en">RGB Coloring</span></label><div class="tog" id="pColor"><button type="button" data-v="0" aria-pressed="false">No</button><button type="button" data-v="1" aria-pressed="true">Sí</button></div></div>
+        </div>
+        <div class="row" id="rRes"><label for="pRes">Resolución de foto<span class="en">Photo Resolution</span></label><select id="pRes"></select></div>
+        <div class="row"><label for="pFmt">Formato de imagen<span class="en">Image Format</span></label><select id="pFmt"></select></div>
+        <div class="row"><label for="pShutter">Velocidad de obturación<span class="en">Shutter Speed (modo S)</span></label>
+          <select id="pShutter"><option value="500">1/500 s</option><option value="800">1/800 s</option><option value="1000" selected>1/1000 s</option><option value="1250">1/1250 s</option><option value="1600">1/1600 s</option><option value="2000">1/2000 s</option></select></div>
+        <div class="row"><label>Obturador mecánico<span class="en">Mechanical Shutter</span></label><div class="tog" id="pMech"><button type="button" data-v="0" aria-pressed="false">No</button><button type="button" data-v="1" aria-pressed="true">Sí</button></div></div>
+        <div class="row"><label>Corrección de distorsión<span class="en">Dewarping</span></label><div class="tog" id="pDewarp"><button type="button" data-v="0" aria-pressed="true">No</button><button type="button" data-v="1" aria-pressed="false">Sí</button></div></div>
+      </div>
+    </details>
+
+    <details class="grp">
+      <summary>05 · Supuestos del simulador</summary>
+      <div class="rows">
+        <div class="row"><label for="pBatt">Autonomía útil por batería<span class="en">valor de referencia, editable</span></label><div class="unit"><input type="number" id="pBatt" min="5" max="60" step="1"><span>min</span></div></div>
+        <p class="hint" id="battInfo"></p>
+        <div class="row"><label for="pTurn">Tiempo por giro entre líneas</label><div class="unit"><input type="number" id="pTurn" value="8" min="0" max="30" step="1"><span>s</span></div></div>
+        <div class="row"><label for="pClimb">Velocidad de ascenso y descenso</label><div class="unit"><input type="number" id="pClimb" value="5" min="1" max="10" step="0.5"><span>m/s</span></div></div>
+      </div>
+    </details>
+  </aside>
+</div>
+
+<section class="panel legal" aria-labelledby="disc-h">
+  <div>
+    <h2 id="disc-h">Descargo de responsabilidad</h2>
+    <p>Material didáctico independiente para practicar la configuración de misiones de Área. No reproduce la interfaz de DJI Pilot 2 ni está afiliado, patrocinado o avalado por DJI. Los nombres de los parámetros se citan en inglés solo para que el usuario los reconozca en el control remoto. DJI, Matrice, Mavic, Zenmuse y Pilot son marcas de sus respectivos titulares.</p>
+    <p>Los resultados son estimaciones teóricas: el GSD se calcula con los datos publicados del sensor; la densidad LiDAR, con la frecuencia de pulsos (primer retorno), la velocidad y el ancho de barrido; el tiempo y las baterías, con los supuestos editables de la sección 05. Pilot 2 usa algoritmos y límites de firmware propios y puede mostrar valores distintos. La densidad real depende de la reflectividad, la vegetación, el relieve y el número de retornos.</p>
+    <p>Esta herramienta no valida el espacio aéreo ni la normativa. Cada operación debe cumplir las reglas de la autoridad aeronáutica del país (DGAC, INAC u otra) y las restricciones de DJI FlySafe. Verifique siempre la misión en el equipo antes de volar.</p>
+    <p>El autor no asume responsabilidad por decisiones, costos, daños o incumplimientos derivados del uso de esta herramienta.</p>
+    <p>© 2026 Ing. Geodesta Mario Forgione L.</p>
+  </div>
+  <div>
+    <h2>Fuentes consultadas</h2>
+    <ul class="srcs">
+      <li class="grp">Fichas técnicas de los equipos</li>
+      <li><a href="https://enterprise.dji.com/matrice-350-rtk/specs" target="_blank" rel="noopener">DJI — Matrice 350 RTK, especificaciones</a></li>
+      <li><a href="https://enterprise.dji.com/matrice-400/specs" target="_blank" rel="noopener">DJI — Matrice 400, especificaciones</a></li>
+      <li><a href="https://enterprise.dji.com/matrice-4-series/specs" target="_blank" rel="noopener">DJI — Matrice 4 Series, especificaciones</a></li>
+      <li><a href="https://enterprise.dji.com/mavic-3-enterprise/specs" target="_blank" rel="noopener">DJI — Mavic 3 Enterprise, especificaciones</a></li>
+      <li><a href="https://ag.dji.com/mavic-3-m/specs" target="_blank" rel="noopener">DJI — Mavic 3 Multispectral, especificaciones</a></li>
+      <li><a href="https://enterprise.dji.com/zenmuse-p1/specs" target="_blank" rel="noopener">DJI — Zenmuse P1, especificaciones</a></li>
+      <li><a href="https://enterprise.dji.com/zenmuse-l2/specs" target="_blank" rel="noopener">DJI — Zenmuse L2, especificaciones</a></li>
+      <li><a href="https://drdrone.ca/pages/dji-zenmuse-l3-technical-specifications" target="_blank" rel="noopener">Dr. Drone — Zenmuse L3, especificaciones técnicas</a></li>
+      <li class="grp">Flujo de parámetros en Pilot 2</li>
+      <li><a href="https://help.propelleraero.com/hc/en-us/articles/19383357911959" target="_blank" rel="noopener">Propeller Aero — Parámetros de Pilot 2 para M3E/M4E, P1 y L1/L2/L3</a></li>
+      <li><a href="https://xcopter.com/download/Zenmuse_L2_Operation_Guide_v1.0.pdf" target="_blank" rel="noopener">DJI — Zenmuse L2 Operation Guide v1.0</a></li>
+      <li class="grp">Normativa y cartografía</li>
+      <li><a href="https://fly-safe.dji.com/" target="_blank" rel="noopener">DJI FlySafe — Zonas geográficas</a></li>
+      <li><a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a> · <a href="https://stuk.github.io/jszip/" target="_blank" rel="noopener">JSZip</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9" target="_blank" rel="noopener">Esri World Imagery</a></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 <b>Ing. Geodesta Mario Forgione L.</b></span>
+  <a class="li" href="https://www.linkedin.com/in/mario-forgione/" target="_blank" rel="noopener">linkedin.com/in/mario-forgione</a>
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   CATÁLOGO DE EQUIPOS (valores de las fichas técnicas publicadas)
+   ===================================================================== */
+// Cámaras: gsdK = metros de suelo por píxel por metro de altura (GSD = gsdK · h)
+// - P1: paso de píxel 35,9 mm / 8192 px y focal real.
+// - Cámaras 4/3 de focal equivalente: a partir del FOV diagonal publicado.
+// - L3 y multiespectral M3M: a partir del FOV horizontal publicado.
+const rad = d => d*Math.PI/180;
+const kDiag = (fovD, w, h) => 2*Math.tan(rad(fovD/2))/Math.hypot(w,h);
+const kHor  = (fovH, w) => 2*Math.tan(rad(fovH/2))/w;
+const CAM = {
+  P1_24:{name:'Zenmuse P1 · 24 mm', w:8192, h:5460, k:(35.9/8192)/24, minI:{JPG:0.7, RAW:0.7}, fmts:['JPG','RAW'], ratio:'3:2', sensor:'Full frame 35,9 × 24 mm · 45 MP'},
+  P1_35:{name:'Zenmuse P1 · 35 mm', w:8192, h:5460, k:(35.9/8192)/35, minI:{JPG:0.7, RAW:0.7}, fmts:['JPG','RAW'], ratio:'3:2', sensor:'Full frame 35,9 × 24 mm · 45 MP'},
+  P1_50:{name:'Zenmuse P1 · 50 mm', w:8192, h:5460, k:(35.9/8192)/50, minI:{JPG:0.7, RAW:0.7}, fmts:['JPG','RAW'], ratio:'3:2', sensor:'Full frame 35,9 × 24 mm · 45 MP'},
+  L2RGB:{name:'Cámara RGB de la L2', w:5280, h:3956, k:kDiag(84,5280,3956), minI:{JPG:0.7, RAW:2}, fmts:['JPG','RAW'], ratio:'4:3', sensor:'4/3 CMOS · 20 MP · 24 mm eq. · FOV 84°'},
+  L3_100:{name:'Cámaras RGB de la L3 · 100 MP', w:12288, h:8192, k:kHor(62,12288), minI:{JPG:1, RAW:1.2}, fmts:['JPG','RAW'], ratio:'3:2', sensor:'4/3 CMOS · 28 mm eq. · FOV H 62°'},
+  L3_25: {name:'Cámaras RGB de la L3 · 25 MP',  w:6144,  h:4096, k:kHor(62,6144),  minI:{JPG:0.5, RAW:1.2}, fmts:['JPG','RAW'], ratio:'3:2', sensor:'4/3 CMOS · 28 mm eq. · FOV H 62°'},
+  M4E:{name:'Gran angular del Matrice 4E', w:5280, h:3956, k:kDiag(84,5280,3956), minI:{JPG:0.5, RAW:0.5}, fmts:['JPG'], ratio:'4:3', sensor:'4/3 CMOS · 20 MP · 24 mm eq. · FOV 84°'},
+  M3E:{name:'Gran angular del Mavic 3E', w:5280, h:3956, k:kDiag(84,5280,3956), minI:{JPG:0.7, RAW:0.7}, fmts:['JPG'], ratio:'4:3', sensor:'4/3 CMOS · 20 MP · 24 mm eq. · FOV 84°'},
+  M3M_RGB:{name:'RGB del Mavic 3M', w:5280, h:3956, k:kDiag(84,5280,3956), minI:{JPG:0.7, RAW:3}, fmts:['JPG','RAW'], ratio:'4:3', sensor:'4/3 CMOS · 20 MP · 24 mm eq. · FOV 84°'},
+  M3M_MS:{name:'Multiespectral del Mavic 3M', w:2592, h:1944, k:kHor(61.2,2592), minI:{JPG:2, RAW:2}, fmts:['JPG'], ratio:'4:3', sensor:'1/2,8″ CMOS · 5 MP · 4 bandas (G 560, R 650, RE 730, NIR 860 nm) · FOV 61,2° × 48,1°'}
+};
+const LIDAR = {
+  L2:{name:'Zenmuse L2', minRange:3,
+    rates:[{v:240, label:'240 kHz', maxR:250, rets:[['1','Simple (Single)'],['2','Doble (Dual)'],['3','Triple (Triple)'],['5','Quíntuple (Penta)']]}],
+    scans:[['rep','Repetitivo (Repetitive)',70,3],['nonrep','No repetitivo (Non-repetitive)',70,75]],
+    rangeNote:'Alcance 250 m con reflectividad 10 % (100 klx) · 450 m con 50 % (0 klx)'},
+  L3:{name:'Zenmuse L3', minRange:10,
+    rates:[{v:100, label:'100 kHz', maxR:500, rets:[['4','4 retornos'],['8','8 retornos'],['16','16 retornos']]},
+           {v:350, label:'350 kHz', maxR:300, rets:[['4','4 retornos'],['8','8 retornos'],['16','16 retornos']]},
+           {v:1000,label:'1000 kHz', maxR:100, rets:[['4','4 retornos'],['8','8 retornos']]},
+           {v:2000,label:'2000 kHz', maxR:50, rets:[['4','4 retornos']]}],
+    scans:[['lin','Lineal (Linear)',80,3],['star','En estrella (Star-shaped)',80,80],['nonrep','No repetitivo (Non-repetitive)',80,80]],
+    rangeNote:'Distancia de trabajo por frecuencia: 100 kHz < 500 m · 350 kHz < 300 m · 1000 kHz < 100 m · 2000 kHz < 50 m'}
+};
+// Cargas útiles por aeronave
+const PAY = {
+  P1:{name:'Zenmuse P1', kind:'cam', lenses:['P1_24','P1_35','P1_50'], def:'P1_35'},
+  L2:{name:'Zenmuse L2', kind:'lidar', lidar:'L2', cam:'L2RGB'},
+  L3:{name:'Zenmuse L3', kind:'lidar', lidar:'L3', cam:'L3'},
+  M4E:{name:'Cámara gran angular integrada', kind:'cam', lenses:['M4E']},
+  M3E:{name:'Cámara gran angular integrada', kind:'cam', lenses:['M3E']},
+  M3M:{name:'RGB + multiespectral integradas', kind:'ms'}
+};
+const PLAT = {
+  M350:{name:'Matrice 350 RTK', vmax:23, decl:55, declNote:'55 min declarados sin carga útil', pays:['P1','L2']},
+  M400:{name:'Matrice 400', vmax:25, decl:59, declNote:'59 min declarados con H30T', pays:['P1','L2','L3']},
+  M4E:{name:'Matrice 4E', vmax:21, decl:49, declNote:'49 min declarados sin viento', pays:['M4E']},
+  M3E:{name:'Mavic 3 Enterprise (3E)', vmax:15, decl:45, declNote:'45 min declarados sin viento', pays:['M3E']},
+  M3M:{name:'Mavic 3 Multispectral (3M)', vmax:15, decl:43, declNote:'43 min declarados sin viento', pays:['M3M']}
+};
+const VCAP = 15; // límite de velocidad de referencia para rutas de área en el simulador
+
+/* =====================================================================
+   ESTADO
+   ===================================================================== */
+const S = {plat:'M350', pay:'L2', lens:'P1_35', coll:'lidar', speedMode:'max', elevOpt:0, imu:1, terrain:0, color:1, mech:1, dewarp:0,
+  poly:[], drawing:false, res:null};
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (v,d=0) => Number(v).toLocaleString('es',{minimumFractionDigits:d, maximumFractionDigits:d});
+
+function camOf(){
+  const p = PAY[S.pay];
+  if(p.kind==='cam') return CAM[S.lens];
+  if(p.kind==='ms') return S.coll==='ms' ? CAM.M3M_MS : CAM.M3M_RGB;
+  if(p.cam==='L3') return $('pRes').value==='25' ? CAM.L3_25 : CAM.L3_100;
+  return CAM[p.cam];
+}
+const isLidar = () => PAY[S.pay].kind==='lidar' && S.coll==='lidar';
+
+/* =====================================================================
+   INTERFAZ: CONSTRUCCIÓN DE SELECTORES
+   ===================================================================== */
+function opts(sel, list, val){ sel.innerHTML = list.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join(''); if(val!==undefined && list.some(x=>x[0]===val)) sel.value = val; }
+function tog(id, val){ $(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v===String(val)))); }
+function bindTog(id, key, after){ $(id).addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return; S[key] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v; tog(id, b.dataset.v); (after||update)(); }); }
+
+function setPlatform(){
+  const P = PLAT[S.plat];
+  opts($('pPay'), P.pays.map(k=>[k, PAY[k].name]), S.pay);
+  S.pay = $('pPay').value;
+  $('pBatt').value = Math.round(P.decl*0.7);
+  $('battInfo').textContent = `Ficha técnica: ${P.declNote}. Por defecto se usa el 70 %, porque la carga útil, el viento, la altitud y la reserva de aterrizaje reducen la autonomía. Ajuste según su experiencia.`;
+  setPayload();
+}
+function setPayload(){
+  const p = PAY[S.pay];
+  $('rLens').hidden = !(p.kind==='cam' && p.lenses.length>1);
+  if(p.kind==='cam'){ opts($('pLens'), p.lenses.map(k=>[k, CAM[k].name.replace(/^Zenmuse P1 · /,'')]), p.def||p.lenses[0]); S.lens = $('pLens').value; }
+  // tipo de colección
+  let coll;
+  if(p.kind==='lidar') coll = [['lidar','Mapeo LiDAR'],['ortho','Fotogrametría']];
+  else if(p.kind==='ms') coll = [['ms','RGB + multiespectral'],['rgb','Solo RGB']];
+  else coll = [['ortho','Ortofoto (Ortho Collection)']];
+  $('rColl').hidden = coll.length===1;
+  $('pColl').innerHTML = coll.map(([v,t])=>`<button type="button" data-v="${v}">${t}</button>`).join('');
+  S.coll = coll[0][0]; tog('pColl', S.coll);
+  // LiDAR
+  if(p.kind==='lidar'){
+    const L = LIDAR[p.lidar];
+    opts($('pRate'), L.rates.map(r=>[String(r.v), r.label]), p.lidar==='L3'?'350':'240');
+    opts($('pScan'), L.scans.map(s=>[s[0], s[1]]), p.lidar==='L3'?'lin':'rep');
+    setReturns();
+  }
+  $('rRes').hidden = p.cam!=='L3';
+  if(p.cam==='L3') opts($('pRes'), [['100','100 MP (12288 × 8192)'],['25','25 MP (6144 × 4096)']], '25');
+  setFormats();
+  applyCollectionDefaults();
+}
+function setReturns(){
+  const p = PAY[S.pay]; if(p.kind!=='lidar') return;
+  const r = LIDAR[p.lidar].rates.find(x=>String(x.v)===$('pRate').value);
+  const prev = $('pRet').value;
+  opts($('pRet'), r.rets, prev && r.rets.some(x=>x[0]===prev) ? prev : (p.lidar==='L2'?'3':r.rets[0][0]));
+}
+function setFormats(){ const c = camOf(); const prev=$('pFmt').value; opts($('pFmt'), c.fmts.map(f=>[f, f==='RAW'?'RAW / JPG+RAW':'JPG']), c.fmts.includes(prev)?prev:'JPG'); }
+function applyCollectionDefaults(){
+  const L = isLidar();
+  $('lidarRows').hidden = !L;
+  $('rSideL').hidden = !L;
+  $('rSide').hidden = L;
+  $('rImu').hidden = !L;
+  $('rElevOpt').hidden = L;
+  $('rGsd').hidden = false;
+  if(L){ $('pPhoto').value='time'; S.speedMode='custom'; tog('pSpeedMode','custom'); $('pSpeed').value = 10; $('pAlt').value = PAY[S.pay].lidar==='L3' ? 150 : 100; $('pFwd').value=80; $('pSide').value=70; $('pSideL').value=50; }
+  else { $('pPhoto').value='dist'; S.speedMode='max'; tog('pSpeedMode','max'); $('pAlt').value = S.pay==='M3M' ? 80 : 100; $('pFwd').value = 80; $('pSide').value = 70; }
+  setFormats();
+  syncGsdFromAlt();
+  update();
+}
+
+/* =====================================================================
+   GEOMETRÍA LOCAL (plano tangente en el centroide)
+   ===================================================================== */
+function frame(){
+  const n = S.poly.length; let la=0, lo=0; S.poly.forEach(p=>{ la+=p[0]; lo+=p[1]; });
+  la/=n; lo/=n;
+  const p = rad(la), mLat = 111132.92 - 559.82*Math.cos(2*p) + 1.175*Math.cos(4*p), mLon = 111412.84*Math.cos(p) - 93.5*Math.cos(3*p);
+  return {la, lo, toXY:([a,b])=>[(b-lo)*mLon, (a-la)*mLat], toLL:([x,y])=>[la+y/mLat, lo+x/mLon]};
+}
+function polyArea(xy){ let s=0; for(let i=0;i<xy.length;i++){ const [x1,y1]=xy[i], [x2,y2]=xy[(i+1)%xy.length]; s+=x1*y2-x2*y1; } return Math.abs(s)/2; }
+
+// Líneas de barrido paralelas al rumbo; cada línea cubre del primer al último cruce con el polígono (+ margen)
+function buildRoute(spacing, courseDeg, margin, startCorner){
+  const F = frame(), xy = S.poly.map(F.toXY), t = rad(courseDeg), s = Math.sin(t), c = Math.cos(t);
+  const U = ([x,y]) => x*s + y*c, W = ([x,y]) => x*c - y*s, X = (u,w) => [u*s + w*c, u*c - w*s];
+  const uw = xy.map(p=>[U(p), W(p)]);
+  let wmin = Math.min(...uw.map(p=>p[1])), wmax = Math.max(...uw.map(p=>p[1]));
+  wmin -= margin; wmax += margin;
+  const width = wmax - wmin, n = Math.max(1, Math.ceil(width/spacing - 1e-9));
+  const off = wmin + (width - (n-1)*spacing)/2;
+  const lines = [];
+  for(let i=0;i<n;i++){
+    const wc = off + i*spacing;
+    const wq = Math.min(Math.max(wc, wmin+margin+1e-6), wmax-margin-1e-6); // líneas dentro del margen usan el cruce del borde
+    const us = [];
+    for(let k=0;k<uw.length;k++){ const [u1,w1]=uw[k], [u2,w2]=uw[(k+1)%uw.length];
+      if((w1<=wq && w2>wq) || (w2<=wq && w1>wq)) us.push(u1 + (wq-w1)*(u2-u1)/(w2-w1)); }
+    if(us.length<2) continue;
+    lines.push([Math.min(...us)-margin, Math.max(...us)+margin, wc]);
+  }
+  // Orden en serpentina según la esquina de inicio
+  const rev = startCorner===1 || startCorner===3, flipFirst = startCorner===2 || startCorner===3;
+  if(rev) lines.reverse();
+  const path = [];
+  lines.forEach((L,i)=>{ let a=[L[0],L[2]], b=[L[1],L[2]]; if((i%2===1) !== flipFirst) [a,b]=[b,a]; path.push(a,b); });
+  const pathXY = path.map(([u,w])=>X(u,w));
+  let lineLen = 0, transLen = 0;
+  for(let i=0;i<pathXY.length-1;i++){ const d = Math.hypot(pathXY[i+1][0]-pathXY[i][0], pathXY[i+1][1]-pathXY[i][1]); if(i%2===0) lineLen+=d; else transLen+=d; }
+  // pasada transversal aproximada para Optimización de elevación (por el centro, perpendicular a las líneas)
+  const umin = Math.min(...uw.map(p=>p[0])), umax = Math.max(...uw.map(p=>p[0]));
+  return {F, xy, lines, pathXY, path:pathXY.map(F.toLL), lineLen, transLen, nLines:lines.length, area:polyArea(xy),
+    crossLen: width, alongSpan: umax-umin, lineLens: lines.map(L=>L[1]-L[0])};
+}
+
+/* =====================================================================
+   CÁLCULO DE LA MISIÓN
+   ===================================================================== */
+function syncGsdFromAlt(){ const c = camOf(), h = heff(); $('pGsd').value = h>0 ? (c.k*h*100).toFixed(2) : ''; }
+function altRel(){ const a = +$('pAlt').value||0; return $('pAltMode').value==='ASL' ? a - (+$('pTakeoffElev').value||0) : a; }
+function heff(){ return altRel() - (+$('pTarget').value||0); }
+function compute(){
+  const plat = PLAT[S.plat], pay = PAY[S.pay], cam = camOf(), L = isLidar();
+  const H = altRel(), h = heff();
+  const msgs = [];
+  if(h<=0){ msgs.push(['bad','La altura sobre la superficie objetivo es cero o negativa: revise la altura de ruta y la superficie objetivo.']); return {msgs, bad:true}; }
+  const gsd = cam.k*h; // m/px
+  const fwdFoot = gsd*cam.h, sideFoot = gsd*cam.w;  // lado largo perpendicular a la dirección de vuelo
+  const fwdOv = (+$('pFwd').value)/100, sideOv = (+$('pSide').value)/100;
+  const fwdSp = fwdFoot*(1-fwdOv), sideSpCam = sideFoot*(1-sideOv);
+  const fmtImg = $('pFmt').value, minI = cam.minI[fmtImg] ?? cam.minI.JPG;
+  let spacing = sideSpCam, gov = 'traslape lateral de la cámara', lid = null;
+  if(L){
+    const LD = LIDAR[pay.lidar], rate = LD.rates.find(r=>String(r.v)===$('pRate').value), sc = LD.scans.find(s=>s[0]===$('pScan').value);
+    const swath = 2*h*Math.tan(rad(sc[2]/2)), sideL = (+$('pSideL').value)/100, spL = swath*(1-sideL);
+    spacing = spL; gov = 'traslape lateral LiDAR';
+    const slant = h/Math.cos(rad(sc[2]/2));
+    lid = {LD, rate, sc, swath, sideL, slant, rets:+$('pRet').value};
+  }
+  // Velocidad
+  const vPhoto = fwdSp/minI;
+  const vLimit = Math.min(plat.vmax, VCAP);
+  let v, vNote = '';
+  if(S.speedMode==='max'){ v = Math.min(vLimit, L ? vLimit : vPhoto); vNote = L ? 'máx.' : (vPhoto<vLimit ? 'limitada por el intervalo de foto' : 'máx. del simulador'); }
+  else v = Math.min(+$('pSpeed').value||1, vLimit);
+  if(!L && $('pPhoto').value==='dist' && S.speedMode==='custom' && v > vPhoto + 1e-9){
+    msgs.push(['warn', `A ${fmt(v,1)} m/s la cámara necesitaría una foto cada ${fmt(fwdSp/v,2)} s, por debajo de su intervalo mínimo (${minI} s en ${fmtImg}). Pilot 2 reduciría la velocidad a ${fmt(vPhoto,1)} m/s.`]);
+    v = vPhoto;
+  }
+  if(L && S.color && v > vPhoto + 1e-9) msgs.push(['warn', `Con la colorización RGB y ${fmt(fwdOv*100)} % de traslape frontal, la cámara necesita una foto cada ${fmt(fwdSp/v,2)} s, pero su mínimo es ${minI} s (${fmtImg}). Baje la velocidad a ${fmt(vPhoto,1)} m/s o reduzca el traslape frontal.`]);
+  const interval = fwdSp/v;
+  // Ruta
+  let R = null;
+  if(S.poly.length>=3){
+    R = buildRoute(spacing, +$('pCourse').value, +$('pMargin').value||0, +$('pStart').value);
+  }
+  // Tiempos
+  const climb = +$('pClimb').value||5, turn = +$('pTurn').value||0;
+  let tLines=0, tTrans=0, tExtra=0, tClimb = 2*Math.max(H, +$('pSafe').value||0)/climb, photos=0, pts=0, extraNotes=[];
+  if(R){
+    tLines = R.lineLen/v; tTrans = R.transLen/v + Math.max(0,R.nLines-1)*turn;
+    photos = R.lineLens.reduce((s,l)=>s+Math.floor(l/fwdSp)+1, 0);
+    if(!L && S.elevOpt){ const ex = R.crossLen/v + 2*turn; tExtra += ex; photos += Math.floor(R.crossLen/fwdSp)+1; extraNotes.push('optimización de elevación'); }
+    if(L && S.imu){ tExtra += 2*30; extraNotes.push('calibración IMU'); }
+    if(L) pts = lid.rate.v*1000*tLines;
+  }
+  const tTotal = tLines + tTrans + tExtra + tClimb;
+  const batt = +$('pBatt').value||30, nBatt = R ? Math.ceil(tTotal/60/batt - 1e-9) : 0;
+  // Densidad LiDAR
+  if(L){
+    lid.dPass = lid.rate.v*1000/(v*lid.swath);
+    lid.dTot = lid.rate.v*1000/(v*spacing);
+  }
+  // Barrido de imagen (motion blur)
+  const shutter = 1/(+$('pShutter').value), blurPx = v*shutter/gsd;
+  return {plat, pay, cam, L, H, h, gsd, fwdFoot, sideFoot, fwdSp, sideSpCam, spacing, gov, minI, fmtImg, v, vNote, vPhoto, interval, R,
+    tLines, tTrans, tExtra, tClimb, tTotal, nBatt, batt, photos, pts, lid, blurPx, msgs, extraNotes};
+}
+
+/* =====================================================================
+   AVISOS TÉCNICOS
+   ===================================================================== */
+function advise(r){
+  const m = r.msgs, L = r.L;
+  if(r.H>120) m.push(['warn', `Altura de ${fmt(r.H)} m: supera los 120 m que muchas autoridades (DGAC, INAC) fijan como límite para operaciones sin autorización especial.`]);
+  if(r.blurPx>1) m.push(['bad', `Barrido de imagen de ${fmt(r.blurPx,2)} px por foto (velocidad × tiempo de obturación ÷ GSD): las fotos saldrán movidas. Use un obturador más rápido o baje la velocidad.`]);
+  else if(r.blurPx>0.5) m.push(['warn', `Barrido de imagen de ${fmt(r.blurPx,2)} px: aceptable para mapeo general, pero conviene mantenerlo por debajo de 0,5 px en trabajos de precisión.`]);
+  if(!S.mech && !['L3'].includes(S.pay) && r.v>5) m.push(['warn', 'Sin obturador mecánico, el obturador electrónico (rolling shutter) deforma la imagen en movimiento; en fotogrametría conviene activarlo.']);
+  if(S.dewarp) m.push(['info', 'Con la corrección de distorsión activada, la cámara guarda la imagen ya corregida; para procesar en software fotogramétrico se recomienda desactivarla y dejar que el programa calibre la cámara.']);
+  if(S.terrain) m.push(['info', 'El seguimiento del terreno requiere cargar un modelo digital de superficie (DSM) en el control remoto. El simulador asume terreno plano; la altura sobre el suelo variará con el relieve.']);
+  if(!L){
+    if(+$('pFwd').value<70 || +$('pSide').value<60) m.push(['warn', 'Traslapes por debajo de 70 % frontal / 60 % lateral reducen la calidad de la reconstrucción, sobre todo en vegetación o en zonas homogéneas.']);
+    if(r.vNote==='limitada por el intervalo de foto') m.push(['info', `La velocidad máxima queda limitada a ${fmt(r.vPhoto,1)} m/s por el intervalo mínimo de foto (${r.minI} s en ${r.fmtImg}) y el traslape frontal.`]);
+    if(S.pay==='M3M' && S.coll==='ms') m.push(['info', 'Con RGB + multiespectral, los traslapes y la velocidad se calculan con la cámara multiespectral, que tiene un campo de visión más estrecho y un intervalo mínimo de 2 s. Para índices de vegetación, vuele cerca del mediodía solar y registre el sensor de luz solar.']);
+  } else {
+    const Ld = r.lid;
+    if(Ld.slant > Ld.rate.maxR) m.push(['bad', `A ${fmt(r.h)} m sobre el terreno, la distancia oblicua al borde del barrido es ≈ ${fmt(Ld.slant)} m y supera el rango de trabajo de ${Ld.rate.label} (${Ld.rate.maxR} m). Baje la altura o elija una frecuencia menor.`]);
+    else if(Ld.slant > 0.8*Ld.rate.maxR) m.push(['warn', `La distancia oblicua al borde del barrido (≈ ${fmt(Ld.slant)} m) está cerca del rango de ${Ld.rate.label}. En superficies oscuras o con poca reflectividad se perderán puntos en los bordes.`]);
+    if(r.h < Ld.LD.minRange*3) m.push(['warn', `Altura muy baja para la ${Ld.LD.name}: su distancia mínima de detección es ${Ld.LD.minRange} m.`]);
+    if(Ld.sideL < 0.2) m.push(['warn', 'Un traslape lateral LiDAR menor a 20 % deja franjas sin cobertura redundante y dificulta el ajuste entre pasadas.']);
+    if(S.color && r.sideFoot < r.spacing) m.push(['warn', `La huella transversal de la cámara (${fmt(r.sideFoot,0)} m) es menor que la separación entre líneas (${fmt(r.spacing,0)} m): quedarán franjas de nube de puntos sin color RGB. Aumente el traslape lateral LiDAR o la altura.`]);
+    if(!S.imu) m.push(['warn', 'Sin calibración IMU, la precisión de la trayectoria (POS) se degrada. DJI recomienda mantenerla activa en misiones LiDAR.']);
+    if(Ld.sc[0]==='rep' || Ld.sc[0]==='lin') m.push(['info', `Escaneo ${Ld.sc[0]==='rep'?'repetitivo':'lineal'} (${Ld.sc[2]}° × ${Ld.sc[3]}°): distribución más uniforme y mejor precisión, recomendado para cartografía y modelos de terreno.`]);
+    else m.push(['info', `Escaneo ${Ld.sc[1].split(' (')[0].toLowerCase()} (${Ld.sc[2]}° × ${Ld.sc[3]}°): cada punto se ve desde varios ángulos; mejora la penetración en vegetación y el registro de fachadas o estructuras.`]);
+    if(Ld.rets>=3) m.push(['info', `Con ${Ld.rets} retornos por pulso, en vegetación se registran más puntos que los estimados: la densidad mostrada corresponde al primer retorno.`]);
+  }
+  if(r.R && r.nBatt>1) m.push(['info', `La misión requiere ${r.nBatt} baterías. Pilot 2 guarda el punto de interrupción y permite reanudar la ruta tras el cambio.`]);
+  if(r.R && r.R.nLines===1) m.push(['warn', 'El área se cubre con una sola línea: revise el ángulo de curso o use una misión de corredor.']);
+  if(!m.length) m.push(['ok','Configuración coherente con los límites del equipo.']);
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+let map, layPoly, layRoute, layVtx, layHome;
+function hms(s){ s = Math.round(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60), x = s%60; return h ? `${h} h ${String(m).padStart(2,'0')} min` : `${m} min ${String(x).padStart(2,'0')} s`; }
+function update(){
+  $('rSpeed').hidden = S.speedMode!=='custom';
+  $('rTakeoffElev').hidden = $('pAltMode').value!=='ASL';
+  $('altEn').textContent = $('pAltMode').value==='ASL' ? 'Route Altitude (ASL) → convertida a ALT' : 'Route Altitude (ALT)';
+  $('oCourse').textContent = $('pCourse').value+'°';
+  ['SideL','Fwd','Side'].forEach(k=>$('o'+k).textContent = $('p'+k).value+' %');
+  const cam = camOf(), pay = PAY[S.pay];
+  $('payInfo').textContent = isLidar() ? `${LIDAR[pay.lidar].name}: ${LIDAR[pay.lidar].rangeNote}. Cámara: ${cam.sensor}.` : `Cámara: ${cam.sensor} · ${cam.w} × ${cam.h} px (${cam.ratio}).`;
+  const r = compute(); S.res = r;
+  advise(r);
+  const K = [];
+  const k = (l,v,u,s,hi) => K.push(`<div class="k${hi?' hi':''}"><div class="l">${l}</div><div class="v">${v}<small>${u||''}</small></div><div class="s">${s||''}</div></div>`);
+  if(r.bad){ $('kpis').innerHTML=''; }
+  else {
+    k('GSD', fmt(r.gsd*100,2), 'cm/px', S.pay==='M3M' && S.coll==='ms' ? `multiespectral · RGB ${fmt(CAM.M3M_RGB.k*r.h*100,2)} cm` : `h sobre superficie ${fmt(r.h)} m`, true);
+    if(r.L){ k('Densidad estimada', fmt(r.lid.dTot,0), 'pts/m²', `${fmt(r.lid.dPass,0)} por pasada · 1.er retorno`, true);
+             k('Ancho de barrido', fmt(r.lid.swath,0), 'm', `FOV ${r.lid.sc[2]}° · ${r.lid.rate.label}`); }
+    else k('Huella de foto', `${fmt(r.sideFoot,0)} × ${fmt(r.fwdFoot,0)}`, 'm', 'transversal × longitudinal');
+    k('Separación de líneas', fmt(r.spacing,1), 'm', `según ${r.gov}`);
+    k('Velocidad', fmt(r.v,1), 'm/s', r.L ? `foto cada ${fmt(r.interval,2)} s` : `foto cada ${fmt(r.fwdSp,1)} m · ${fmt(r.interval,2)} s`);
+    if(r.R){
+      k('Área', fmt(r.R.area/10000,2), 'ha', `${r.R.nLines} líneas`);
+      k('Longitud de ruta', fmt((r.R.lineLen+r.R.transLen)/1000,2), 'km', `en líneas ${fmt(r.R.lineLen/1000,2)} km`);
+      k('Tiempo estimado', hms(r.tTotal), '', `incluye ascenso, giros${r.extraNotes.length?' y '+r.extraNotes.join(', '):''}`, true);
+      k('Baterías', r.nBatt, '', `a ${r.batt} min útiles c/u`);
+      k('Fotos', fmt(r.photos), '', r.L ? 'para colorización' : `${r.cam.ratio} · ${r.fmtImg}`);
+      if(r.L) k('Puntos estimados', fmt(r.pts/1e6,0), 'millones', '1.er retorno, en líneas');
+    }
+    $('kpis').innerHTML = K.join('');
+  }
+  $('msgs').innerHTML = r.msgs.map(([l,t])=>`<div class="msg" data-l="${l}">${esc(t)}</div>`).join('');
+  drawRoute(r);
+  $('bExport').disabled = !r.R;
+}
+
+function initMap(){
+  if(typeof L==='undefined'){ $('map').innerHTML = '<p class="note" style="padding:14px">No se pudo cargar el mapa (librería Leaflet). Revise la conexión a internet.</p>'; return; }
+  map = L.map('map', {zoomControl:true, doubleClickZoom:false}).setView([-0.18, -78.47], 15);
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:20, attribution:'Esri World Imagery'});
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap contributors'});
+  sat.addTo(map); L.control.layers({'Satélite (Esri)':sat, 'OpenStreetMap':osm}, {}, {position:'topright'}).addTo(map);
+  L.control.scale({imperial:false}).addTo(map);
+  layPoly = L.layerGroup().addTo(map); layRoute = L.layerGroup().addTo(map); layVtx = L.layerGroup().addTo(map); layHome = L.layerGroup().addTo(map);
+  map.on('click', e=>{ if(!S.drawing) return; S.poly.push([e.latlng.lat, e.latlng.lng]); drawPoly(); $('bFinish').disabled = S.poly.length<3; $('mapStatus').textContent = `${S.poly.length} vértice(s). ${S.poly.length<3?'Agregue al menos 3.':'Cierre el polígono para calcular.'}`; });
+}
+function drawPoly(){
+  if(!map) return;
+  layPoly.clearLayers(); layVtx.clearLayers();
+  if(!S.poly.length) return;
+  if(S.poly.length>=3 && !S.drawing) L.polygon(S.poly, {color:'#FFFFFF', weight:2, fillColor:'#145487', fillOpacity:.18, dashArray:'6 4'}).addTo(layPoly);
+  else L.polyline(S.poly, {color:'#FFFFFF', weight:2, dashArray:'6 4'}).addTo(layPoly);
+  S.poly.forEach((p,i)=>{
+    const m = L.marker(p, {draggable:true, icon:L.divIcon({className:'vtx'}), keyboard:false}).addTo(layVtx);
+    m.on('drag', e=>{ S.poly[i] = [e.latlng.lat, e.latlng.lng]; if(!S.drawing) update(); else drawPolyLight(); });
+    m.on('dragend', ()=>drawPoly());
+  });
+}
+function drawPolyLight(){ layPoly.clearLayers(); L.polyline(S.poly, {color:'#FFFFFF', weight:2, dashArray:'6 4'}).addTo(layPoly); }
+function drawRoute(r){
+  if(!map) return;
+  layRoute.clearLayers(); layHome.clearLayers();
+  if(S.poly.length>=3 && !S.drawing){ layPoly.clearLayers(); L.polygon(S.poly, {color:'#FFFFFF', weight:2, fillColor:'#145487', fillOpacity:.18, dashArray:'6 4'}).addTo(layPoly); }
+  if(!r.R || !r.R.path.length) return;
+  L.polyline(r.R.path, {color:'#ED6D15', weight:2.5, opacity:.95}).addTo(layRoute);
+  const p0 = r.R.path[0], p1 = r.R.path[r.R.path.length-1];
+  L.marker(p0, {icon:L.divIcon({className:'home', html:'S'}), interactive:false}).addTo(layHome);
+  L.circleMarker(p1, {radius:5, color:'#FFFFFF', weight:2, fillColor:'#B42318', fillOpacity:1}).addTo(layHome);
+}
+
+/* ---------- Área ---------- */
+function startDraw(){ S.drawing = true; S.poly = []; drawPoly(); drawRoute({}); $('bDraw').classList.add('on'); $('bFinish').disabled = true; $('mapStatus').textContent = 'Haga clic en el mapa para agregar vértices.'; if(map) map.getContainer().style.cursor='crosshair'; update(); }
+function finishDraw(){ if(S.poly.length<3) return; S.drawing = false; $('bDraw').classList.remove('on'); $('bFinish').disabled = true; if(map) map.getContainer().style.cursor=''; $('mapStatus').textContent = 'Arrastre los vértices para ajustar el área.'; drawPoly(); update(); }
+function setPoly(pts, fit){ S.drawing=false; S.poly = pts; $('bDraw').classList.remove('on'); $('bFinish').disabled = true; if(map) map.getContainer().style.cursor='';
+  drawPoly(); update(); if(fit && map) map.fitBounds(L.polygon(pts).getBounds().pad(0.25)); $('mapStatus').textContent = 'Arrastre los vértices para ajustar el área.'; }
+function example(){ setPoly([[-0.17766,-78.48235],[-0.17741,-78.47807],[-0.1812,-78.47702],[-0.18291,-78.4801],[-0.18137,-78.48296]], true); }
+async function loadKml(file){
+  try{
+    let text;
+    if(/\.kmz$/i.test(file.name)){ if(typeof JSZip==='undefined') throw new Error('No se pudo cargar JSZip para leer el KMZ.'); const z = await JSZip.loadAsync(await file.arrayBuffer()); const k = Object.values(z.files).find(f=>/\.kml$/i.test(f.name)); if(!k) throw new Error('El KMZ no contiene un .kml.'); text = await k.async('string'); }
+    else text = await file.text();
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    const polys = Array.from(doc.getElementsByTagNameNS('*','Polygon'));
+    if(!polys.length) throw new Error('El archivo no contiene polígonos.');
+    // se toma el polígono de mayor número de vértices; solo el anillo exterior
+    const rings = polys.map(p=>{ const ob = p.getElementsByTagNameNS('*','outerBoundaryIs')[0] || p; const c = ob.getElementsByTagNameNS('*','coordinates')[0]; return (c?c.textContent:'').trim().split(/\s+/).map(s=>s.split(',').map(Number)).filter(a=>a.length>=2 && !isNaN(a[0]) && !isNaN(a[1])).map(a=>[a[1],a[0]]); });
+    let ring = rings.sort((a,b)=>b.length-a.length)[0];
+    if(ring.length>3 && ring[0][0]===ring[ring.length-1][0] && ring[0][1]===ring[ring.length-1][1]) ring = ring.slice(0,-1);
+    if(ring.length<3) throw new Error('El polígono no tiene vértices suficientes.');
+    setPoly(ring, true);
+    $('mapStatus').textContent = polys.length>1 ? `Se cargó el mayor de ${polys.length} polígonos.` : 'Polígono cargado. Arrastre los vértices para ajustar.';
+  }catch(e){ $('mapStatus').textContent = e.message; }
+}
+function exportKml(){
+  const r = S.res; if(!r || !r.R) return;
+  const cc = ll => `${ll[1].toFixed(8)},${ll[0].toFixed(8)},${(+$('pAlt').value).toFixed(1)}`;
+  const desc = `${PLAT[S.plat].name} + ${PAY[S.pay].name} · GSD ${fmt(r.gsd*100,2)} cm · altura ${$('pAlt').value} m · separación ${fmt(r.spacing,1)} m · velocidad ${fmt(r.v,1)} m/s · ángulo ${$('pCourse').value}°`;
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Simulación de misión de área</name>
+<description>${esc(desc)} · Generado con el Simulador de Misiones de Área (Geospatial Engineering Tools). Material didáctico: no es un archivo de misión de DJI.</description>
+<Style id="a"><LineStyle><color>ffffffff</color><width>2</width></LineStyle><PolyStyle><color>40875414</color></PolyStyle></Style>
+<Style id="r"><LineStyle><color>ff156ded</color><width>2.5</width></LineStyle></Style>
+<Placemark><name>Área</name><styleUrl>#a</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>${[...S.poly, S.poly[0]].map(p=>`${p[1]},${p[0]},0`).join(' ')}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+<Placemark><name>Ruta simulada</name><description>${esc(desc)}</description><styleUrl>#r</styleUrl><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>${r.R.path.map(cc).join(' ')}</coordinates></LineString></Placemark>
+</Document></kml>`;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'})); a.download = 'mision_area_simulada.kml';
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function autoCourse(){
+  if(S.poly.length<3) return;
+  const F = frame(), xy = S.poly.map(F.toXY); let best=0, ang=0;
+  for(let i=0;i<xy.length;i++){ const [x1,y1]=xy[i], [x2,y2]=xy[(i+1)%xy.length]; const d=Math.hypot(x2-x1,y2-y1); if(d>best){ best=d; ang=(Math.atan2(x2-x1, y2-y1)*180/Math.PI+360)%360; } }
+  $('pCourse').value = Math.round(ang)%360; update();
+}
+
+/* ---------- Eventos ---------- */
+(function init(){
+  opts($('pPlat'), Object.entries(PLAT).map(([k,p])=>[k,p.name]), S.plat);
+  initMap();
+  setPlatform();
+  $('pPlat').addEventListener('change', e=>{ S.plat = e.target.value; setPlatform(); });
+  $('pPay').addEventListener('change', e=>{ S.pay = e.target.value; setPayload(); });
+  $('pLens').addEventListener('change', e=>{ S.lens = e.target.value; setFormats(); syncGsdFromAlt(); update(); });
+  $('pColl').addEventListener('click', e=>{ const b=e.target.closest('button'); if(!b) return; S.coll=b.dataset.v; tog('pColl',S.coll); applyCollectionDefaults(); });
+  $('pRate').addEventListener('change', ()=>{ setReturns(); update(); });
+  $('pRes').addEventListener('change', ()=>{ setFormats(); syncGsdFromAlt(); update(); });
+  bindTog('pSpeedMode','speedMode'); bindTog('pElevOpt','elevOpt'); bindTog('pImu','imu'); bindTog('pTerrain','terrain');
+  bindTog('pColor','color'); bindTog('pMech','mech'); bindTog('pDewarp','dewarp');
+  ['pAlt','pTarget'].forEach(id=>$(id).addEventListener('input', ()=>{ syncGsdFromAlt(); update(); }));
+  $('pGsd').addEventListener('input', ()=>{ const g = +$('pGsd').value; if(g>0){ const h = g/100/camOf().k; $('pAlt').value = Math.round(h + (+$('pTarget').value||0) + ($('pAltMode').value==='ASL' ? (+$('pTakeoffElev').value||0) : 0)); } update(); });
+  $('pAltMode').addEventListener('change', ()=>{
+    const elev = +$('pTakeoffElev').value||0, a = +$('pAlt').value||0;
+    $('pAlt').value = $('pAltMode').value==='ASL' ? a+elev : a-elev; update(); });
+  $('pTakeoffElev').addEventListener('input', ()=>{ syncGsdFromAlt(); update(); });
+  ['pSpeed','pCourse','pSideL','pFwd','pSide','pMargin','pPhoto','pStart','pRet','pScan','pFmt','pShutter','pBatt','pTurn','pClimb','pSafe','pEnd'].forEach(id=>$(id).addEventListener('input', update));
+  $('bDraw').addEventListener('click', ()=>S.drawing ? finishDraw() : startDraw());
+  $('bFinish').addEventListener('click', finishDraw);
+  $('bEx').addEventListener('click', example);
+  $('bClear').addEventListener('click', ()=>{ S.drawing=false; S.poly=[]; $('bDraw').classList.remove('on'); if(map) map.getContainer().style.cursor=''; drawPoly(); update(); $('mapStatus').textContent='Dibuje un área o cargue el ejemplo.'; });
+  $('bKml').addEventListener('click', ()=>$('fKml').click());
+  $('fKml').addEventListener('change', e=>{ if(e.target.files[0]) loadKml(e.target.files[0]); e.target.value=''; });
+  $('bExport').addEventListener('click', exportKml);
+  $('bAutoCourse').addEventListener('click', autoCourse);
+  example();
+})();
+</script>
+
+<!-- GET: volver al portafolio -->
+<style>
+.get-home{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:2147483000;display:inline-flex;align-items:center;gap:8px;padding:8px 13px 8px 10px;border-radius:999px;background:#145487;color:#FFFFFF;text-decoration:none;border:2px solid #145487;box-shadow:0 4px 14px rgba(8,18,28,.28);font:700 12px/1 'Orbitron','Arial Narrow',Arial,sans-serif;letter-spacing:.1em;-webkit-tap-highlight-color:transparent}
+.get-home svg{width:17px;height:17px;flex:none;display:block}
+.get-home .get-t{white-space:nowrap}
+.get-home:hover{border-color:#ED6D15;background:#0F4470}
+.get-home:focus-visible{outline:2px solid #ED6D15;outline-offset:3px}
+@media (max-width:640px){.get-home{padding:9px}.get-home .get-t{display:none}}
+@media print{.get-home{display:none}}
+</style>
+<div class="get-home-sp" aria-hidden="true" style="height:60px"></div>
+<a class="get-home" href="index.html" title="Volver a Geospatial Engineering Tools" aria-label="Volver a Geospatial Engineering Tools">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.2 12 4l9 7.2" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 10v9.5h5v-5.5h3v5.5h5V10" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="10.6" r="1.4" fill="#ED6D15"/></svg>
+<span class="get-t">GET</span></a>
+</body>
+</html>
